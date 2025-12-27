@@ -37,6 +37,40 @@
   --border-hover: rgba(0, 0, 0, 0.15);
 }
 
+/* High contrast mode - dark */
+[data-high-contrast="true"] {
+  --background: #000000;
+  --background-secondary: #0a0a0a;
+  --foreground: #ffffff;
+  --foreground-muted: #d4d4d4;
+  --card: #0a0a0a;
+  --card-hover: #171717;
+  --border: rgba(255, 255, 255, 0.2);
+  --border-hover: rgba(255, 255, 255, 0.4);
+  --coral: #ff8a7a;
+  --rose: #ffccd5;
+  --emerald: #4ade80;
+  --blue: #93c5fd;
+  --amber: #fcd34d;
+}
+
+/* High contrast mode - light */
+[data-theme="light"][data-high-contrast="true"] {
+  --background: #ffffff;
+  --background-secondary: #f5f5f5;
+  --foreground: #000000;
+  --foreground-muted: #404040;
+  --card: #ffffff;
+  --card-hover: #e5e5e5;
+  --border: rgba(0, 0, 0, 0.3);
+  --border-hover: rgba(0, 0, 0, 0.5);
+  --coral: #dc2626;
+  --rose: #be185d;
+  --emerald: #059669;
+  --blue: #1d4ed8;
+  --amber: #d97706;
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-background-secondary: var(--background-secondary);

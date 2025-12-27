@@ -600,21 +600,28 @@ export default function Home() {
   const [testProfile, setTestProfile] = useState<TestProfile>("standard");
   const [showSettings, setShowSettings] = useState(false);
   
+  // Accessibility settings
+  const [highContrast, setHighContrast] = useState(false);
+  const [showAchievements, setShowAchievements] = useState(false);
+  
   // Ref to track incognito mode during async test execution
   const incognitoRef = useRef(false);
 
   // Test duration presets (ms per phase)
   const profileDurations: Record<TestProfile, number> = {
-    quick: 5000,    // 5 seconds per phase = 15s total
-    standard: 10000, // 10 seconds per phase = 30s total
-    extended: 20000, // 20 seconds per phase = 60s total
+    quick: 5000,
+    standard: 10000,
+    extended: 20000,
   };
 
-  // Theme effect
+  // Load theme and high contrast setting on mount
   useEffect(() => {
     const savedTheme = window.localStorage.getItem("speedlabs-theme") || "dark";
+    const savedHighContrast = window.localStorage.getItem("speedlabs-highcontrast") === "true";
     setTheme(savedTheme);
+    setHighContrast(savedHighContrast);
     document.documentElement.setAttribute("data-theme", savedTheme);
+    document.documentElement.setAttribute("data-high-contrast", String(savedHighContrast));
   }, []);
 
   useEffect(() => {
@@ -622,6 +629,13 @@ export default function Home() {
     document.documentElement.setAttribute("data-theme", theme);
   }, [theme]);
 
+  // Persist high contrast setting
+  useEffect(() => {
+    window.localStorage.setItem("speedlabs-highcontrast", String(highContrast));
+    document.documentElement.setAttribute("data-high-contrast", String(highContrast));
+  }, [highContrast]);
+
+  // Load history and baseline from localStorage
   useEffect(() => {
     const stored = window.localStorage.getItem("speedtest-history");
     if (stored) {
@@ -645,18 +659,38 @@ export default function Home() {
     }
   }, []);
 
+  // Save history to localStorage
   useEffect(() => {
     if (historyLoaded) {
       window.localStorage.setItem("speedtest-history", JSON.stringify(history));
     }
   }, [history, historyLoaded]);
 
+  // Save baseline to localStorage
   useEffect(() => {
     window.localStorage.setItem(
       "speedtest-baseline",
       JSON.stringify({ ispDown, ispUp, ispPing })
     );
   }, [ispDown, ispUp, ispPing]);
+
+  // Calculate unlocked achievements based on history
+  const unlockedAchievements = useMemo(() => {
+    return ACHIEVEMENTS.filter(achievement => achievement.condition(history));
+  }, [history]);
+
+  // Get newly unlocked achievements (for notifications)
+  const achievementProgress = useMemo(() => {
+    const total = ACHIEVEMENTS.length;
+    const unlocked = unlockedAchievements.length;
+    const byTier = {
+      bronze: unlockedAchievements.filter(a => a.tier === 'bronze').length,
+      silver: unlockedAchievements.filter(a => a.tier === 'silver').length,
+      gold: unlockedAchievements.filter(a => a.tier === 'gold').length,
+      platinum: unlockedAchievements.filter(a => a.tier === 'platinum').length,
+    };
+    return { total, unlocked, percentage: Math.round((unlocked / total) * 100), byTier };
+  }, [unlockedAchievements]);
 
   const startTest = (isIncognito: boolean = false) => {
     if (status === "running") return;
