@@ -528,6 +528,7 @@ export default function Home() {
   const [upload, setUpload] = useState(0);
   const [ping, setPing] = useState(0);
   const [history, setHistory] = useState<SpeedResult[]>([]);
+  const [historyLoaded, setHistoryLoaded] = useState(false);
   const [ispDown, setIspDown] = useState(300);
   const [ispUp, setIspUp] = useState(50);
   const [ispPing, setIspPing] = useState(15);
@@ -574,6 +575,7 @@ export default function Home() {
         console.error("Failed to parse history", err);
       }
     }
+    setHistoryLoaded(true);
     const storedBaseline = window.localStorage.getItem("speedtest-baseline");
     if (storedBaseline) {
       try {
@@ -588,8 +590,10 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    window.localStorage.setItem("speedtest-history", JSON.stringify(history));
-  }, [history]);
+    if (historyLoaded) {
+      window.localStorage.setItem("speedtest-history", JSON.stringify(history));
+    }
+  }, [history, historyLoaded]);
 
   useEffect(() => {
     window.localStorage.setItem(
@@ -805,7 +809,7 @@ export default function Home() {
             
             // Only save to history if not in incognito mode
             if (!incognitoMode) {
-              setHistory((prevHistory) => [result, ...prevHistory].slice(0, 8));
+              setHistory((prevHistory) => [result, ...prevHistory].slice(0, 50));
             }
             
             // Show results modal after a brief delay
