@@ -103,8 +103,8 @@ export default function Home() {
     setRealtimeUp([]);
 
     const phaseDuration = 10000; // 10 seconds per phase
-    const updateInterval = 300; // Update every 300ms
-    const sampleInterval = 300; // Sample every 300ms
+    const updateInterval = 100; // Sample every 100ms
+    const displayInterval = 300; // Update display every 300ms
 
     const computeMedian = (arr: number[]) => {
       if (!arr.length) return 0;
@@ -118,22 +118,30 @@ export default function Home() {
       setPhase("ping");
       const phaseStart = performance.now();
       let lastUpdate = phaseStart;
+      let lastDisplay = phaseStart;
       const pingSamples: number[] = [];
+      const displaySamples: number[] = [];
 
       const step = (now: DOMHighResTimeStamp) => {
         const elapsed = now - phaseStart;
         const phaseProgress = Math.min(100, (elapsed / phaseDuration) * 100);
 
+        // Sample every 100ms
         if (now - lastUpdate >= updateInterval || phaseProgress >= 100) {
           lastUpdate = now;
           const simulatedPing = 5 + Math.random() * 25;
           pingSamples.push(simulatedPing);
           
-          // Show average of last few samples for smoother display
-          const recent = pingSamples.slice(-3);
-          const avg = recent.reduce((a, b) => a + b, 0) / recent.length;
-          setPing(avg);
-          setRealtimePing([...pingSamples]);
+          // Update display every 300ms with averaged values
+          if (now - lastDisplay >= displayInterval || phaseProgress >= 100) {
+            lastDisplay = now;
+            const windowSize = 3; // Average last 3 samples (300ms window)
+            const recent = pingSamples.slice(-windowSize);
+            const avg = recent.reduce((a, b) => a + b, 0) / recent.length;
+            displaySamples.push(avg);
+            setPing(avg);
+            setRealtimePing([...displaySamples]);
+          }
           setProgress(phaseProgress / 3); // 0-33%
         }
 
@@ -152,22 +160,30 @@ export default function Home() {
       setPhase("download");
       const phaseStart = performance.now();
       let lastUpdate = phaseStart;
+      let lastDisplay = phaseStart;
       const downloadSamples: number[] = [];
+      const displaySamples: number[] = [];
 
       const step = (now: DOMHighResTimeStamp) => {
         const elapsed = now - phaseStart;
         const phaseProgress = Math.min(100, (elapsed / phaseDuration) * 100);
 
+        // Sample every 100ms
         if (now - lastUpdate >= updateInterval || phaseProgress >= 100) {
           lastUpdate = now;
           const simulatedDownload = 60 + Math.random() * 200;
           downloadSamples.push(simulatedDownload);
           
-          // Show average of last few samples for smoother display
-          const recent = downloadSamples.slice(-3);
-          const avg = recent.reduce((a, b) => a + b, 0) / recent.length;
-          setDownload(avg);
-          setRealtimeDown([...downloadSamples]);
+          // Update display every 300ms with averaged values
+          if (now - lastDisplay >= displayInterval || phaseProgress >= 100) {
+            lastDisplay = now;
+            const windowSize = 3; // Average last 3 samples (300ms window)
+            const recent = downloadSamples.slice(-windowSize);
+            const avg = recent.reduce((a, b) => a + b, 0) / recent.length;
+            displaySamples.push(avg);
+            setDownload(avg);
+            setRealtimeDown([...displaySamples]);
+          }
           setProgress(33.33 + phaseProgress / 3); // 33-66%
         }
 
@@ -186,22 +202,30 @@ export default function Home() {
       setPhase("upload");
       const phaseStart = performance.now();
       let lastUpdate = phaseStart;
+      let lastDisplay = phaseStart;
       const uploadSamples: number[] = [];
+      const displaySamples: number[] = [];
 
       const step = (now: DOMHighResTimeStamp) => {
         const elapsed = now - phaseStart;
         const phaseProgress = Math.min(100, (elapsed / phaseDuration) * 100);
 
+        // Sample every 100ms
         if (now - lastUpdate >= updateInterval || phaseProgress >= 100) {
           lastUpdate = now;
           const simulatedUpload = 20 + Math.random() * 110;
           uploadSamples.push(simulatedUpload);
           
-          // Show average of last few samples for smoother display
-          const recent = uploadSamples.slice(-3);
-          const avg = recent.reduce((a, b) => a + b, 0) / recent.length;
-          setUpload(avg);
-          setRealtimeUp([...uploadSamples]);
+          // Update display every 300ms with averaged values
+          if (now - lastDisplay >= displayInterval || phaseProgress >= 100) {
+            lastDisplay = now;
+            const windowSize = 3; // Average last 3 samples (300ms window)
+            const recent = uploadSamples.slice(-windowSize);
+            const avg = recent.reduce((a, b) => a + b, 0) / recent.length;
+            displaySamples.push(avg);
+            setUpload(avg);
+            setRealtimeUp([...displaySamples]);
+          }
           setProgress(66.66 + phaseProgress / 3); // 66-100%
         }
 
@@ -424,10 +448,10 @@ export default function Home() {
               </button>
 
               {/* Real-time phase graph (single view) */}
-              <div className="mt-6 rounded-2xl border border-white/15 bg-gradient-to-br from-black/40 to-black/20 p-5">
-                <div className="flex items-center justify-between mb-3">
+              <div className="mt-6 rounded-2xl border border-white/15 bg-gradient-to-br from-black/50 to-black/30 p-6 shadow-xl backdrop-blur-sm">
+                <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2">
-                    <span className={`h-2.5 w-2.5 rounded-full ${running ? "animate-pulse" : ""} ${phase === "ping" ? "bg-emerald-400" : phase === "download" ? "bg-[#F58F7C]" : phase === "upload" ? "bg-[#F2C4CE]" : "bg-white/30"}`} />
+                    <span className={`h-2.5 w-2.5 rounded-full ${running ? "animate-pulse" : ""} ${phase === "ping" ? "bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,0.6)]" : phase === "download" ? "bg-[#F58F7C] shadow-[0_0_12px_rgba(245,143,124,0.6)]" : phase === "upload" ? "bg-[#F2C4CE] shadow-[0_0_12px_rgba(242,196,206,0.6)]" : "bg-white/30"}`} />
                     <p className="text-sm font-semibold text-white">
                       {phase === "ping" && "⏱ Ping Latency"}
                       {phase === "download" && "↓ Download Speed"}
@@ -440,55 +464,95 @@ export default function Home() {
                       (phase === "download" && realtimeDown.length > 0) || 
                       (phase === "upload" && realtimeUp.length > 0)) && (
                       <p className="text-xs text-white/60">
-                        {phase === "ping" && `${realtimePing.length} samples`}
-                        {phase === "download" && `${realtimeDown.length} samples`}
-                        {phase === "upload" && `${realtimeUp.length} samples`}
+                        {phase === "ping" && `${realtimePing.length} points`}
+                        {phase === "download" && `${realtimeDown.length} points`}
+                        {phase === "upload" && `${realtimeUp.length} points`}
                       </p>
                     )}
                     <p className="text-sm font-bold text-[#F58F7C]">{Math.round(progress)}%</p>
                   </div>
                 </div>
                 
-                <svg viewBox="0 0 400 50" className="w-full h-14">
-                  {phase === "ping" && realtimePing.length > 0 && (
-                    <path
-                      d={buildSparkPath(realtimePing, 400, 50)}
-                      fill="none"
-                      stroke="#34d399"
-                      strokeWidth="2.5"
-                      strokeLinejoin="round"
-                      strokeLinecap="round"
-                      className="drop-shadow-[0_2px_8px_rgba(52,211,153,0.5)]"
-                    />
-                  )}
-                  {phase === "download" && realtimeDown.length > 0 && (
-                    <path
-                      d={buildSparkPath(realtimeDown, 400, 50)}
-                      fill="none"
-                      stroke="#F58F7C"
-                      strokeWidth="2.5"
-                      strokeLinejoin="round"
-                      strokeLinecap="round"
-                      className="drop-shadow-[0_2px_8px_rgba(245,143,124,0.5)]"
-                    />
-                  )}
-                  {phase === "upload" && realtimeUp.length > 0 && (
-                    <path
-                      d={buildSparkPath(realtimeUp, 400, 50)}
-                      fill="none"
-                      stroke="#F2C4CE"
-                      strokeWidth="2.5"
-                      strokeLinejoin="round"
-                      strokeLinecap="round"
-                      className="drop-shadow-[0_2px_8px_rgba(242,196,206,0.5)]"
-                    />
-                  )}
-                  <line x1="0" x2="400" y1="50" y2="50" stroke="rgba(255,255,255,0.08)" strokeWidth="1" />
-                </svg>
+                <div className="relative">
+                  <svg viewBox="0 0 400 60" className="w-full h-16" preserveAspectRatio="none">
+                    <defs>
+                      <linearGradient id="pingGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                        <stop offset="0%" stopColor="#34d399" stopOpacity="0.3" />
+                        <stop offset="100%" stopColor="#34d399" stopOpacity="0.05" />
+                      </linearGradient>
+                      <linearGradient id="downloadGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                        <stop offset="0%" stopColor="#F58F7C" stopOpacity="0.3" />
+                        <stop offset="100%" stopColor="#F58F7C" stopOpacity="0.05" />
+                      </linearGradient>
+                      <linearGradient id="uploadGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                        <stop offset="0%" stopColor="#F2C4CE" stopOpacity="0.3" />
+                        <stop offset="100%" stopColor="#F2C4CE" stopOpacity="0.05" />
+                      </linearGradient>
+                    </defs>
+                    
+                    {/* Grid lines */}
+                    <line x1="0" x2="400" y1="15" y2="15" stroke="rgba(255,255,255,0.03)" strokeWidth="1" />
+                    <line x1="0" x2="400" y1="30" y2="30" stroke="rgba(255,255,255,0.05)" strokeWidth="1" />
+                    <line x1="0" x2="400" y1="45" y2="45" stroke="rgba(255,255,255,0.03)" strokeWidth="1" />
+                    
+                    {phase === "ping" && realtimePing.length > 0 && (
+                      <>
+                        <path
+                          d={`${buildSparkPath(realtimePing, 400, 60)} L400,60 L0,60 Z`}
+                          fill="url(#pingGradient)"
+                        />
+                        <path
+                          d={buildSparkPath(realtimePing, 400, 60)}
+                          fill="none"
+                          stroke="#34d399"
+                          strokeWidth="3"
+                          strokeLinejoin="round"
+                          strokeLinecap="round"
+                          className="drop-shadow-[0_3px_10px_rgba(52,211,153,0.6)]"
+                        />
+                      </>
+                    )}
+                    {phase === "download" && realtimeDown.length > 0 && (
+                      <>
+                        <path
+                          d={`${buildSparkPath(realtimeDown, 400, 60)} L400,60 L0,60 Z`}
+                          fill="url(#downloadGradient)"
+                        />
+                        <path
+                          d={buildSparkPath(realtimeDown, 400, 60)}
+                          fill="none"
+                          stroke="#F58F7C"
+                          strokeWidth="3"
+                          strokeLinejoin="round"
+                          strokeLinecap="round"
+                          className="drop-shadow-[0_3px_10px_rgba(245,143,124,0.6)]"
+                        />
+                      </>
+                    )}
+                    {phase === "upload" && realtimeUp.length > 0 && (
+                      <>
+                        <path
+                          d={`${buildSparkPath(realtimeUp, 400, 60)} L400,60 L0,60 Z`}
+                          fill="url(#uploadGradient)"
+                        />
+                        <path
+                          d={buildSparkPath(realtimeUp, 400, 60)}
+                          fill="none"
+                          stroke="#F2C4CE"
+                          strokeWidth="3"
+                          strokeLinejoin="round"
+                          strokeLinecap="round"
+                          className="drop-shadow-[0_3px_10px_rgba(242,196,206,0.6)]"
+                        />
+                      </>
+                    )}
+                    <line x1="0" x2="400" y1="60" y2="60" stroke="rgba(255,255,255,0.1)" strokeWidth="1" />
+                  </svg>
+                </div>
 
-                <p className="mt-3 text-xs text-[#D6D6D6]/60 text-center">
+                <p className="mt-4 text-xs text-[#D6D6D6]/60 text-center">
                   {status === "idle" && "Ready to begin • 3 phases • 30 seconds total"}
-                  {status === "running" && `Phase ${phase === "ping" ? "1" : phase === "download" ? "2" : "3"} of 3 • Testing in progress...`}
+                  {status === "running" && `Phase ${phase === "ping" ? "1" : phase === "download" ? "2" : "3"} of 3 • Sampling every 100ms, averaging over 300ms`}
                   {status === "done" && "All phases complete • Results calculated using median values"}
                 </p>
               </div>
