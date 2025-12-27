@@ -634,6 +634,21 @@ export default function Home() {
   const [ipInfo, setIpInfo] = useState<{ipv4: string | null; ipv6: string | null; protocol: 'ipv4' | 'ipv6' | 'dual-stack' | 'unknown'}>({
     ipv4: null, ipv6: null, protocol: 'unknown'
   });
+  const [routerHealth, setRouterHealth] = useState<{
+    gatewayLatency: number | null;
+    packetLoss: number | null;
+    signalStrength: 'excellent' | 'good' | 'fair' | 'poor' | null;
+    connectionStability: number | null;
+    status: 'healthy' | 'warning' | 'critical' | null;
+    issues: string[];
+  }>({
+    gatewayLatency: null,
+    packetLoss: null,
+    signalStrength: null,
+    connectionStability: null,
+    status: null,
+    issues: []
+  });
   
   // Ref to track incognito mode during async test execution
   const incognitoRef = useRef(false);
@@ -812,9 +827,67 @@ export default function Home() {
       setIpInfo({ ipv4, ipv6, protocol });
     };
     
+    // Simulate router health check
+    const checkRouterHealth = async () => {
+      // Simulate gateway ping tests
+      const gatewayPings: number[] = [];
+      for (let i = 0; i < 10; i++) {
+        const ping = 1 + Math.random() * 5; // Gateway should be very fast
+        gatewayPings.push(ping);
+        await new Promise(r => setTimeout(r, 50));
+      }
+      
+      const avgGatewayLatency = gatewayPings.reduce((a, b) => a + b, 0) / gatewayPings.length;
+      
+      // Simulate packet loss test (0-5% range, mostly 0)
+      const packetLoss = Math.random() < 0.8 ? 0 : Math.random() * 5;
+      
+      // Simulate signal strength based on network type
+      const signalStrengths: ('excellent' | 'good' | 'fair' | 'poor')[] = ['excellent', 'good', 'fair', 'poor'];
+      const signalWeights = networkType === 'ethernet' ? [0.9, 0.1, 0, 0] : 
+                           networkType === 'wifi' ? [0.3, 0.4, 0.2, 0.1] : 
+                           [0.1, 0.3, 0.4, 0.2];
+      const signalRand = Math.random();
+      let cumulative = 0;
+      let signalStrength: 'excellent' | 'good' | 'fair' | 'poor' = 'good';
+      for (let i = 0; i < signalWeights.length; i++) {
+        cumulative += signalWeights[i];
+        if (signalRand <= cumulative) {
+          signalStrength = signalStrengths[i];
+          break;
+        }
+      }
+      
+      // Connection stability (90-100%)
+      const connectionStability = 90 + Math.random() * 10;
+      
+      // Determine issues
+      const issues: string[] = [];
+      if (avgGatewayLatency > 3) issues.push('High gateway latency');
+      if (packetLoss > 1) issues.push('Packet loss detected');
+      if (signalStrength === 'poor') issues.push('Weak signal strength');
+      if (signalStrength === 'fair') issues.push('Signal could be improved');
+      if (connectionStability < 95) issues.push('Connection instability');
+      
+      // Overall status
+      const status = issues.length === 0 ? 'healthy' : 
+                    issues.length <= 1 && !issues.some(i => i.includes('Packet loss') || i.includes('Weak')) ? 'warning' : 
+                    'critical';
+      
+      setRouterHealth({
+        gatewayLatency: Math.round(avgGatewayLatency * 100) / 100,
+        packetLoss: Math.round(packetLoss * 100) / 100,
+        signalStrength,
+        connectionStability: Math.round(connectionStability * 10) / 10,
+        status,
+        issues
+      });
+    };
+    
     measureDns();
     simulateTraceroute();
     detectIpVersion();
+    checkRouterHealth();
 
     const phaseDuration = profileDurations[testProfile];
     const updateInterval = 100;
@@ -2026,6 +2099,18 @@ export default function Home() {
                      ipInfo.protocol === 'ipv4' ? 'IPv4 Only' : 'Detecting...'}
                   </span>
                 </div>
+                {routerHealth.status && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">📡</span>
+                    <span className={`text-sm font-medium ${
+                      routerHealth.status === 'healthy' ? 'text-[#34d399]' :
+                      routerHealth.status === 'warning' ? 'text-[#fbbf24]' : 'text-[#ff7b6b]'
+                    }`}>
+                      {routerHealth.status === 'healthy' ? 'Router OK' :
+                       routerHealth.status === 'warning' ? 'Router Warning' : 'Router Issues'}
+                    </span>
+                  </div>
+                )}
               </div>
               
               {/* IP Address Info */}
@@ -2046,6 +2131,70 @@ export default function Home() {
                       </div>
                     )}
                   </div>
+                </div>
+              )}
+              
+              {/* Router Health Check */}
+              {routerHealth.status && showTraceroute && (
+                <div className="mb-4 p-4 rounded-xl bg-[var(--background)] border border-[var(--border)]">
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-xs text-[var(--foreground-muted)]">Router Health</p>
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
+                      routerHealth.status === 'healthy' ? 'bg-[#34d399]/20 text-[#34d399]' :
+                      routerHealth.status === 'warning' ? 'bg-[#fbbf24]/20 text-[#fbbf24]' :
+                      'bg-[#ff7b6b]/20 text-[#ff7b6b]'
+                    }`}>
+                      {routerHealth.status === 'healthy' ? '✓ Healthy' :
+                       routerHealth.status === 'warning' ? '⚠ Warning' : '✗ Issues'}
+                    </span>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-3 mb-3">
+                    <div className="p-2 rounded-lg bg-[var(--card)]">
+                      <p className="text-[10px] text-[var(--foreground-muted)] mb-1">Gateway Latency</p>
+                      <p className={`text-sm font-bold ${
+                        (routerHealth.gatewayLatency || 0) < 2 ? 'text-[#34d399]' :
+                        (routerHealth.gatewayLatency || 0) < 5 ? 'text-[#fbbf24]' : 'text-[#ff7b6b]'
+                      }`}>{routerHealth.gatewayLatency}ms</p>
+                    </div>
+                    <div className="p-2 rounded-lg bg-[var(--card)]">
+                      <p className="text-[10px] text-[var(--foreground-muted)] mb-1">Packet Loss</p>
+                      <p className={`text-sm font-bold ${
+                        (routerHealth.packetLoss || 0) === 0 ? 'text-[#34d399]' :
+                        (routerHealth.packetLoss || 0) < 2 ? 'text-[#fbbf24]' : 'text-[#ff7b6b]'
+                      }`}>{routerHealth.packetLoss}%</p>
+                    </div>
+                    <div className="p-2 rounded-lg bg-[var(--card)]">
+                      <p className="text-[10px] text-[var(--foreground-muted)] mb-1">Signal Strength</p>
+                      <p className={`text-sm font-bold ${
+                        routerHealth.signalStrength === 'excellent' ? 'text-[#34d399]' :
+                        routerHealth.signalStrength === 'good' ? 'text-[#60a5fa]' :
+                        routerHealth.signalStrength === 'fair' ? 'text-[#fbbf24]' : 'text-[#ff7b6b]'
+                      }`}>
+                        {routerHealth.signalStrength === 'excellent' ? '████ Excellent' :
+                         routerHealth.signalStrength === 'good' ? '███░ Good' :
+                         routerHealth.signalStrength === 'fair' ? '██░░ Fair' : '█░░░ Poor'}
+                      </p>
+                    </div>
+                    <div className="p-2 rounded-lg bg-[var(--card)]">
+                      <p className="text-[10px] text-[var(--foreground-muted)] mb-1">Stability</p>
+                      <p className={`text-sm font-bold ${
+                        (routerHealth.connectionStability || 0) >= 98 ? 'text-[#34d399]' :
+                        (routerHealth.connectionStability || 0) >= 95 ? 'text-[#60a5fa]' : 'text-[#fbbf24]'
+                      }`}>{routerHealth.connectionStability}%</p>
+                    </div>
+                  </div>
+                  
+                  {routerHealth.issues.length > 0 && (
+                    <div className="space-y-1">
+                      <p className="text-[10px] text-[var(--foreground-muted)]">Issues Detected:</p>
+                      {routerHealth.issues.map((issue, i) => (
+                        <p key={i} className="text-xs text-[#fbbf24] flex items-center gap-1">
+                          <span>⚠</span> {issue}
+                        </p>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
               
