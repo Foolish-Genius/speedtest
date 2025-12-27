@@ -631,6 +631,9 @@ export default function Home() {
   const [dnsLookupTime, setDnsLookupTime] = useState<number | null>(null);
   const [tracerouteData, setTracerouteData] = useState<{hop: number; host: string; latency: number; status: 'ok' | 'slow' | 'timeout'}[]>([]);
   const [showTraceroute, setShowTraceroute] = useState(false);
+  const [ipInfo, setIpInfo] = useState<{ipv4: string | null; ipv6: string | null; protocol: 'ipv4' | 'ipv6' | 'dual-stack' | 'unknown'}>({
+    ipv4: null, ipv6: null, protocol: 'unknown'
+  });
   
   // Ref to track incognito mode during async test execution
   const incognitoRef = useRef(false);
@@ -778,8 +781,40 @@ export default function Home() {
       setTracerouteData(results);
     };
     
+    // Detect IPv4/IPv6 support
+    const detectIpVersion = async () => {
+      let ipv4: string | null = null;
+      let ipv6: string | null = null;
+      
+      // Try to detect IPv4
+      try {
+        const res4 = await fetch('https://api.ipify.org?format=json', { cache: 'no-store' });
+        const data4 = await res4.json();
+        ipv4 = data4.ip;
+      } catch {
+        // IPv4 not available
+      }
+      
+      // Try to detect IPv6
+      try {
+        const res6 = await fetch('https://api64.ipify.org?format=json', { cache: 'no-store' });
+        const data6 = await res6.json();
+        if (data6.ip && data6.ip.includes(':')) {
+          ipv6 = data6.ip;
+        } else if (!ipv4) {
+          ipv4 = data6.ip; // Fallback if IPv6 service returns IPv4
+        }
+      } catch {
+        // IPv6 not available
+      }
+      
+      const protocol = ipv4 && ipv6 ? 'dual-stack' : ipv4 ? 'ipv4' : ipv6 ? 'ipv6' : 'unknown';
+      setIpInfo({ ipv4, ipv6, protocol });
+    };
+    
     measureDns();
     simulateTraceroute();
+    detectIpVersion();
 
     const phaseDuration = profileDurations[testProfile];
     const updateInterval = 100;
@@ -1963,7 +1998,7 @@ export default function Home() {
               </div>
               
               {/* Mini summary */}
-              <div className="flex items-center gap-4 mb-4">
+              <div className="flex flex-wrap items-center gap-4 mb-4">
                 <div className="flex items-center gap-2">
                   <span className="text-lg">🔗</span>
                   <span className="text-sm font-medium">{tracerouteData.length} hops</span>
@@ -1979,7 +2014,40 @@ export default function Home() {
                     <><span className="text-lg">✅</span><span className="text-sm text-[#34d399]">All hops healthy</span></>
                   )}
                 </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">🌐</span>
+                  <span className={`text-sm font-medium ${
+                    ipInfo.protocol === 'dual-stack' ? 'text-[#34d399]' :
+                    ipInfo.protocol === 'ipv6' ? 'text-[#60a5fa]' :
+                    ipInfo.protocol === 'ipv4' ? 'text-[#fbbf24]' : 'text-[var(--foreground-muted)]'
+                  }`}>
+                    {ipInfo.protocol === 'dual-stack' ? 'IPv4 + IPv6' :
+                     ipInfo.protocol === 'ipv6' ? 'IPv6 Only' :
+                     ipInfo.protocol === 'ipv4' ? 'IPv4 Only' : 'Detecting...'}
+                  </span>
+                </div>
               </div>
+              
+              {/* IP Address Info */}
+              {(ipInfo.ipv4 || ipInfo.ipv6) && showTraceroute && (
+                <div className="mb-4 p-3 rounded-xl bg-[var(--background)] border border-[var(--border)]">
+                  <p className="text-xs text-[var(--foreground-muted)] mb-2">Your IP Addresses</p>
+                  <div className="flex flex-col gap-1">
+                    {ipInfo.ipv4 && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-medium text-[#fbbf24]">IPv4:</span>
+                        <code className="text-xs font-mono">{ipInfo.ipv4}</code>
+                      </div>
+                    )}
+                    {ipInfo.ipv6 && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-medium text-[#60a5fa]">IPv6:</span>
+                        <code className="text-xs font-mono truncate">{ipInfo.ipv6}</code>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
               
               {showTraceroute && (
                 <div className="space-y-2">
