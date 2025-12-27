@@ -2624,6 +2624,109 @@ export default function Home() {
             </section>
           )}
 
+          {/* Privacy Report */}
+          <section className="rounded-3xl border border-[var(--border)] bg-[var(--card)] p-6 shadow-xl">
+            <div className="space-y-1 mb-6">
+              <p className="text-xs uppercase tracking-wider text-[#10b981] font-semibold">Privacy Report</p>
+              <h3 className="text-sm text-[var(--foreground-muted)]">How we handle your data</h3>
+            </div>
+            
+            <div className="space-y-4">
+              {/* Data Storage Overview */}
+              <div className="rounded-xl bg-[var(--background)] border border-[var(--border)] p-4">
+                <div className="flex items-center gap-3 mb-3">
+                  <span className="text-2xl">🔒</span>
+                  <div>
+                    <p className="font-medium text-sm">100% Local Storage</p>
+                    <p className="text-xs text-[var(--foreground-muted)]">All your test data stays on your device</p>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-[var(--foreground-muted)]">Test Results</span>
+                    <span className="text-[#10b981]">✓ Stored locally</span>
+                  </div>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-[var(--foreground-muted)]">Settings & Preferences</span>
+                    <span className="text-[#10b981]">✓ Stored locally</span>
+                  </div>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-[var(--foreground-muted)]">IP Address</span>
+                    <span className="text-[#fbbf24]">⚡ Used transiently</span>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Data Categories */}
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="rounded-xl bg-[#10b981]/10 border border-[#10b981]/30 p-3">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-lg">📊</span>
+                    <span className="text-xs font-semibold text-[#10b981]">LOCAL DATA</span>
+                  </div>
+                  <ul className="text-xs space-y-1 text-[var(--foreground-muted)]">
+                    <li>• Speed test results ({history.length} entries)</li>
+                    <li>• Location tags you create</li>
+                    <li>• Theme & accessibility settings</li>
+                    <li>• Data retention preferences</li>
+                    <li>• Achievement progress</li>
+                  </ul>
+                </div>
+                
+                <div className="rounded-xl bg-[#60a5fa]/10 border border-[#60a5fa]/30 p-3">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-lg">🌐</span>
+                    <span className="text-xs font-semibold text-[#60a5fa]">NETWORK DATA</span>
+                  </div>
+                  <ul className="text-xs space-y-1 text-[var(--foreground-muted)]">
+                    <li>• IP address (for IP detection only)</li>
+                    <li>• Connection measurements</li>
+                    <li>• DNS lookup times</li>
+                    <li>• Not stored on any server</li>
+                    <li>• Not shared with third parties</li>
+                  </ul>
+                </div>
+              </div>
+              
+              {/* Privacy Features */}
+              <div className="space-y-2">
+                <p className="text-xs text-[var(--foreground-muted)] font-medium">Your Privacy Controls:</p>
+                <div className="grid gap-2 sm:grid-cols-3">
+                  <div className="flex items-center gap-2 rounded-lg bg-[var(--background)] p-2 border border-[var(--border)]">
+                    <span className="text-sm">🕶️</span>
+                    <span className="text-xs">Incognito Mode</span>
+                  </div>
+                  <div className="flex items-center gap-2 rounded-lg bg-[var(--background)] p-2 border border-[var(--border)]">
+                    <span className="text-sm">🗑️</span>
+                    <span className="text-xs">Delete History</span>
+                  </div>
+                  <div className="flex items-center gap-2 rounded-lg bg-[var(--background)] p-2 border border-[var(--border)]">
+                    <span className="text-sm">⏰</span>
+                    <span className="text-xs">Auto-Delete</span>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Current Settings Summary */}
+              <div className="pt-3 border-t border-[var(--border)]">
+                <p className="text-xs text-[var(--foreground-muted)] mb-2">Current Data Settings:</p>
+                <div className="flex flex-wrap gap-2">
+                  <span className="px-2 py-1 rounded-full bg-[var(--background)] text-xs border border-[var(--border)]">
+                    📦 Max {dataRetention.maxEntries} entries
+                  </span>
+                  <span className={`px-2 py-1 rounded-full text-xs border ${
+                    dataRetention.autoDelete ? 'bg-[#10b981]/20 border-[#10b981]/30 text-[#10b981]' : 'bg-[var(--background)] border-[var(--border)]'
+                  }`}>
+                    {dataRetention.autoDelete ? `⏰ Auto-delete after ${dataRetention.deleteAfterDays} days` : '⏸️ Manual deletion only'}
+                  </span>
+                  <span className="px-2 py-1 rounded-full bg-[var(--background)] text-xs border border-[var(--border)]">
+                    💾 ~{((JSON.stringify(history).length / 1024)).toFixed(1)}KB stored
+                  </span>
+                </div>
+              </div>
+            </div>
+          </section>
+
           {/* Performance Benchmarks */}
           {latest && (
             <section className="rounded-3xl border border-[var(--border)] bg-[var(--card)] p-6 shadow-xl">
