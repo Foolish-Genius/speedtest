@@ -876,6 +876,257 @@ export default function Home() {
     };
   }, [history]);
 
+  // Sprint 3: Peak/Off-Peak Detection
+  const peakAnalysis = useMemo(() => {
+    if (history.length < 3) return null;
+    
+    // Group tests by hour of day
+    const hourlyData: { [hour: number]: { downloads: number[], uploads: number[], pings: number[] } } = {};
+    
+    history.forEach(test => {
+      const hour = new Date(test.timestamp).getHours();
+      if (!hourlyData[hour]) {
+        hourlyData[hour] = { downloads: [], uploads: [], pings: [] };
+      }
+      hourlyData[hour].downloads.push(test.download);
+      hourlyData[hour].uploads.push(test.upload);
+      hourlyData[hour].pings.push(test.ping);
+    });
+    
+    // Calculate averages per hour
+    const hourlyAverages = Object.entries(hourlyData).map(([hour, data]) => ({
+      hour: parseInt(hour),
+      avgDown: data.downloads.reduce((a, b) => a + b, 0) / data.downloads.length,
+      avgUp: data.uploads.reduce((a, b) => a + b, 0) / data.uploads.length,
+      avgPing: data.pings.reduce((a, b) => a + b, 0) / data.pings.length,
+      testCount: data.downloads.length,
+    }));
+    
+    if (hourlyAverages.length < 2) return null;
+    
+    // Find best and worst hours
+    const sortedBySpeed = [...hourlyAverages].sort((a, b) => b.avgDown - a.avgDown);
+    const bestHour = sortedBySpeed[0];
+    const worstHour = sortedBySpeed[sortedBySpeed.length - 1];
+    
+    // Classify time periods
+    const morningHours = hourlyAverages.filter(h => h.hour >= 6 && h.hour < 12);
+    const afternoonHours = hourlyAverages.filter(h => h.hour >= 12 && h.hour < 18);
+    const eveningHours = hourlyAverages.filter(h => h.hour >= 18 && h.hour < 22);
+    const nightHours = hourlyAverages.filter(h => h.hour >= 22 || h.hour < 6);
+    
+    const avgByPeriod = (hours: typeof hourlyAverages) => 
+      hours.length ? hours.reduce((sum, h) => sum + h.avgDown, 0) / hours.length : 0;
+    
+    return {
+      bestHour,
+      worstHour,
+      speedDifference: bestHour.avgDown - worstHour.avgDown,
+      periodAverages: {
+        morning: avgByPeriod(morningHours),
+        afternoon: avgByPeriod(afternoonHours),
+        evening: avgByPeriod(eveningHours),
+        night: avgByPeriod(nightHours),
+      },
+      hourlyData: hourlyAverages,
+    };
+  }, [history]);
+
+  // Sprint 3: Anomaly Detection
+  const anomalies = useMemo(() => {
+    if (history.length < 5) return [];
+    
+    // Calculate overall averages
+    const avgDown = history.reduce((sum, h) => sum + h.download, 0) / history.length;
+    const avgUp = history.reduce((sum, h) => sum + h.upload, 0) / history.length;
+    const avgPing = history.reduce((sum, h) => sum + h.ping, 0) / history.length;
+    
+    // Calculate standard deviations
+    const stdDown = Math.sqrt(history.reduce((sum, h) => sum + Math.pow(h.download - avgDown, 2), 0) / history.length);
+    const stdUp = Math.sqrt(history.reduce((sum, h) => sum + Math.pow(h.upload - avgUp, 2), 0) / history.length);
+    const stdPing = Math.sqrt(history.reduce((sum, h) => sum + Math.pow(h.ping - avgPing, 2), 0) / history.length);
+    
+    // Find anomalies (more than 2 standard deviations from mean)
+    const threshold = 2;
+    const detected: { id: string; timestamp: number; type: string; message: string; severity: 'warning' | 'critical' }[] = [];
+    
+    history.slice(0, 10).forEach(test => {
+      // Check download anomaly
+      if (test.download < avgDown - threshold * stdDown) {
+        const dropPercent = Math.round(((avgDown - test.download) / avgDown) * 100);
+        detected.push({
+          id: test.id,
+          timestamp: test.timestamp,
+          type: 'download_drop',
+          message: `Download dropped ${dropPercent}% below average`,
+          severity: dropPercent > 50 ? 'critical' : 'warning',
+        });
+      }
+      
+      // Check upload anomaly
+      if (test.upload < avgUp - threshold * stdUp) {
+        const dropPercent = Math.round(((avgUp - test.upload) / avgUp) * 100);
+        detected.push({
+          id: test.id,
+          timestamp: test.timestamp,
+          type: 'upload_drop',
+          message: `Upload dropped ${dropPercent}% below average`,
+          severity: dropPercent > 50 ? 'critical' : 'warning',
+        });
+      }
+      
+      // Check ping spike
+      if (test.ping > avgPing + threshold * stdPing) {
+        const spikePercent = Math.round(((test.ping - avgPing) / avgPing) * 100);
+        detected.push({
+          id: test.id,
+          timestamp: test.timestamp,
+          type: 'ping_spike',
+          message: `Ping spiked ${spikePercent}% above average`,
+          severity: spikePercent > 100 ? 'critical' : 'warning',
+        });
+      }
+    });
+    
+    return detected.slice(0, 5); // Return top 5 anomalies
+  }, [history]);
+
+  // Sprint 3: Smart Insights Generation
+  const smartInsights = useMemo(() => {
+    const insights: { icon: string; title: string; message: string; type: 'tip' | 'warning' | 'success' | 'info' }[] = [];
+    
+    if (history.length === 0) return insights;
+    
+    const avgDown = history.reduce((sum, h) => sum + h.download, 0) / history.length;
+    const avgUp = history.reduce((sum, h) => sum + h.upload, 0) / history.length;
+    const avgPing = history.reduce((sum, h) => sum + h.ping, 0) / history.length;
+    
+    // ISP comparison insight
+    if (latest) {
+      const downPerformance = (avgDown / ispDown) * 100;
+      if (downPerformance >= 90) {
+        insights.push({
+          icon: '🎯',
+          title: 'Great Performance',
+          message: `Your speeds average ${downPerformance.toFixed(0)}% of your ISP plan. You're getting excellent value!`,
+          type: 'success',
+        });
+      } else if (downPerformance < 70) {
+        insights.push({
+          icon: '⚠️',
+          title: 'Below Expected',
+          message: `You're only getting ${downPerformance.toFixed(0)}% of your paid speed. Consider contacting your ISP.`,
+          type: 'warning',
+        });
+      }
+    }
+    
+    // Peak hour insight
+    if (peakAnalysis && peakAnalysis.speedDifference > 20) {
+      const formatHour = (h: number) => {
+        const ampm = h >= 12 ? 'PM' : 'AM';
+        const hour12 = h % 12 || 12;
+        return `${hour12}${ampm}`;
+      };
+      insights.push({
+        icon: '⏰',
+        title: 'Best Testing Time',
+        message: `Your speeds are ${peakAnalysis.speedDifference.toFixed(0)} Mbps faster around ${formatHour(peakAnalysis.bestHour.hour)} vs ${formatHour(peakAnalysis.worstHour.hour)}.`,
+        type: 'tip',
+      });
+    }
+    
+    // Stability insight
+    if (latest?.stats) {
+      if (latest.stats.stabilityScore >= 85) {
+        insights.push({
+          icon: '📊',
+          title: 'Stable Connection',
+          message: `Your connection stability is excellent at ${latest.stats.stabilityScore}%. Great for video calls and gaming!`,
+          type: 'success',
+        });
+      } else if (latest.stats.stabilityScore < 60) {
+        insights.push({
+          icon: '📶',
+          title: 'Unstable Connection',
+          message: `Stability score of ${latest.stats.stabilityScore}% may cause buffering. Try moving closer to your router.`,
+          type: 'warning',
+        });
+      }
+    }
+    
+    // Jitter insight for gaming
+    if (latest?.stats && latest.stats.jitter > 10) {
+      insights.push({
+        icon: '🎮',
+        title: 'Gaming Alert',
+        message: `Jitter of ${latest.stats.jitter.toFixed(1)}ms may affect online gaming. Wired connection recommended.`,
+        type: 'tip',
+      });
+    } else if (latest?.stats && latest.stats.jitter <= 5) {
+      insights.push({
+        icon: '🎮',
+        title: 'Gaming Ready',
+        message: `Low jitter of ${latest.stats.jitter.toFixed(1)}ms is perfect for competitive gaming!`,
+        type: 'success',
+      });
+    }
+    
+    // Anomaly insight
+    if (anomalies.length > 0) {
+      const criticalCount = anomalies.filter(a => a.severity === 'critical').length;
+      if (criticalCount > 0) {
+        insights.push({
+          icon: '🔴',
+          title: 'Issues Detected',
+          message: `${criticalCount} significant speed drop${criticalCount > 1 ? 's' : ''} detected recently. Check for network interference.`,
+          type: 'warning',
+        });
+      }
+    }
+    
+    // Test frequency insight
+    if (history.length >= 5) {
+      const daysCovered = (Date.now() - history[history.length - 1].timestamp) / (1000 * 60 * 60 * 24);
+      const testsPerWeek = (history.length / daysCovered) * 7;
+      if (testsPerWeek >= 7) {
+        insights.push({
+          icon: '📈',
+          title: 'Good Testing Habit',
+          message: `You're testing ${testsPerWeek.toFixed(1)}x per week. This helps track patterns effectively!`,
+          type: 'info',
+        });
+      }
+    }
+    
+    // Network type comparison (if multiple types tested)
+    const typeGroups = history.reduce((acc, h) => {
+      const type = h.networkType || 'unknown';
+      if (!acc[type]) acc[type] = [];
+      acc[type].push(h.download);
+      return acc;
+    }, {} as Record<string, number[]>);
+    
+    const typeCount = Object.keys(typeGroups).filter(k => k !== 'unknown').length;
+    if (typeCount >= 2) {
+      const typeAvgs = Object.entries(typeGroups).map(([type, speeds]) => ({
+        type,
+        avg: speeds.reduce((a, b) => a + b, 0) / speeds.length,
+      })).sort((a, b) => b.avg - a.avg);
+      
+      if (typeAvgs[0].avg - typeAvgs[typeAvgs.length - 1].avg > 30) {
+        insights.push({
+          icon: '🔌',
+          title: 'Network Comparison',
+          message: `${typeAvgs[0].type.charAt(0).toUpperCase() + typeAvgs[0].type.slice(1)} performs ${(typeAvgs[0].avg - typeAvgs[typeAvgs.length - 1].avg).toFixed(0)} Mbps faster than ${typeAvgs[typeAvgs.length - 1].type}.`,
+          type: 'info',
+        });
+      }
+    }
+    
+    return insights.slice(0, 4); // Return top 4 insights
+  }, [history, latest, ispDown, peakAnalysis, anomalies]);
+
   // Export functions
   const exportAsJSON = () => {
     const dataStr = JSON.stringify(history, null, 2);
@@ -1388,6 +1639,286 @@ export default function Home() {
               )}
             </div>
           </section>
+
+          {/* Sprint 3: Speed Comparison Bars */}
+          {latest && (
+            <section className="rounded-3xl border border-[var(--border)] bg-[var(--card)] p-6 shadow-xl">
+              <div className="space-y-1 mb-6">
+                <p className="text-xs uppercase tracking-wider text-[#60a5fa] font-semibold">Speed Comparison</p>
+                <h3 className="text-sm text-[var(--foreground-muted)]">Current vs Baseline vs Average</h3>
+              </div>
+              
+              <div className="space-y-5">
+                {/* Download Comparison */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-[var(--foreground-muted)]">Download</span>
+                    <span className="text-[#ff7b6b] font-semibold">{latest.download.toFixed(1)} Mbps</span>
+                  </div>
+                  <div className="space-y-1.5">
+                    <div className="flex items-center gap-3">
+                      <span className="text-[10px] text-[var(--foreground-muted)] w-16">Current</span>
+                      <div className="flex-1 h-3 rounded-full bg-[var(--background-secondary)] overflow-hidden">
+                        <div 
+                          className="h-full rounded-full bg-gradient-to-r from-[#ff7b6b] to-[#ff9d91] transition-all duration-500"
+                          style={{ width: `${Math.min((latest.download / Math.max(ispDown, timeAnalytics?.last7d.avgDown || 1, latest.download) * 1.1) * 100, 100)}%` }}
+                        />
+                      </div>
+                      <span className="text-[10px] font-medium w-14 text-right">{latest.download.toFixed(0)}</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-[10px] text-[var(--foreground-muted)] w-16">Baseline</span>
+                      <div className="flex-1 h-3 rounded-full bg-[var(--background-secondary)] overflow-hidden">
+                        <div 
+                          className="h-full rounded-full bg-[#60a5fa]/60 transition-all duration-500"
+                          style={{ width: `${Math.min((ispDown / Math.max(ispDown, timeAnalytics?.last7d.avgDown || 1, latest.download) * 1.1) * 100, 100)}%` }}
+                        />
+                      </div>
+                      <span className="text-[10px] font-medium w-14 text-right">{ispDown}</span>
+                    </div>
+                    {timeAnalytics && timeAnalytics.last7d.count > 0 && (
+                      <div className="flex items-center gap-3">
+                        <span className="text-[10px] text-[var(--foreground-muted)] w-16">7d Avg</span>
+                        <div className="flex-1 h-3 rounded-full bg-[var(--background-secondary)] overflow-hidden">
+                          <div 
+                            className="h-full rounded-full bg-[#34d399]/60 transition-all duration-500"
+                            style={{ width: `${Math.min((timeAnalytics.last7d.avgDown / Math.max(ispDown, timeAnalytics.last7d.avgDown, latest.download) * 1.1) * 100, 100)}%` }}
+                          />
+                        </div>
+                        <span className="text-[10px] font-medium w-14 text-right">{timeAnalytics.last7d.avgDown.toFixed(0)}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Upload Comparison */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-[var(--foreground-muted)]">Upload</span>
+                    <span className="text-[#f4b8c5] font-semibold">{latest.upload.toFixed(1)} Mbps</span>
+                  </div>
+                  <div className="space-y-1.5">
+                    <div className="flex items-center gap-3">
+                      <span className="text-[10px] text-[var(--foreground-muted)] w-16">Current</span>
+                      <div className="flex-1 h-3 rounded-full bg-[var(--background-secondary)] overflow-hidden">
+                        <div 
+                          className="h-full rounded-full bg-gradient-to-r from-[#f4b8c5] to-[#fad4dd] transition-all duration-500"
+                          style={{ width: `${Math.min((latest.upload / Math.max(ispUp, timeAnalytics?.last7d.avgUp || 1, latest.upload) * 1.1) * 100, 100)}%` }}
+                        />
+                      </div>
+                      <span className="text-[10px] font-medium w-14 text-right">{latest.upload.toFixed(0)}</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-[10px] text-[var(--foreground-muted)] w-16">Baseline</span>
+                      <div className="flex-1 h-3 rounded-full bg-[var(--background-secondary)] overflow-hidden">
+                        <div 
+                          className="h-full rounded-full bg-[#60a5fa]/60 transition-all duration-500"
+                          style={{ width: `${Math.min((ispUp / Math.max(ispUp, timeAnalytics?.last7d.avgUp || 1, latest.upload) * 1.1) * 100, 100)}%` }}
+                        />
+                      </div>
+                      <span className="text-[10px] font-medium w-14 text-right">{ispUp}</span>
+                    </div>
+                    {timeAnalytics && timeAnalytics.last7d.count > 0 && (
+                      <div className="flex items-center gap-3">
+                        <span className="text-[10px] text-[var(--foreground-muted)] w-16">7d Avg</span>
+                        <div className="flex-1 h-3 rounded-full bg-[var(--background-secondary)] overflow-hidden">
+                          <div 
+                            className="h-full rounded-full bg-[#34d399]/60 transition-all duration-500"
+                            style={{ width: `${Math.min((timeAnalytics.last7d.avgUp / Math.max(ispUp, timeAnalytics.last7d.avgUp, latest.upload) * 1.1) * 100, 100)}%` }}
+                          />
+                        </div>
+                        <span className="text-[10px] font-medium w-14 text-right">{timeAnalytics.last7d.avgUp.toFixed(0)}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Ping Comparison */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-[var(--foreground-muted)]">Ping</span>
+                    <span className="text-[#34d399] font-semibold">{latest.ping} ms</span>
+                  </div>
+                  <div className="space-y-1.5">
+                    <div className="flex items-center gap-3">
+                      <span className="text-[10px] text-[var(--foreground-muted)] w-16">Current</span>
+                      <div className="flex-1 h-3 rounded-full bg-[var(--background-secondary)] overflow-hidden">
+                        <div 
+                          className="h-full rounded-full bg-gradient-to-r from-[#34d399] to-[#6ee7b7] transition-all duration-500"
+                          style={{ width: `${Math.min((latest.ping / Math.max(ispPing * 2, timeAnalytics?.last7d.avgPing || 1, latest.ping) * 1.1) * 100, 100)}%` }}
+                        />
+                      </div>
+                      <span className="text-[10px] font-medium w-14 text-right">{latest.ping}</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-[10px] text-[var(--foreground-muted)] w-16">Baseline</span>
+                      <div className="flex-1 h-3 rounded-full bg-[var(--background-secondary)] overflow-hidden">
+                        <div 
+                          className="h-full rounded-full bg-[#60a5fa]/60 transition-all duration-500"
+                          style={{ width: `${Math.min((ispPing / Math.max(ispPing * 2, timeAnalytics?.last7d.avgPing || 1, latest.ping) * 1.1) * 100, 100)}%` }}
+                        />
+                      </div>
+                      <span className="text-[10px] font-medium w-14 text-right">{ispPing}</span>
+                    </div>
+                    {timeAnalytics && timeAnalytics.last7d.count > 0 && (
+                      <div className="flex items-center gap-3">
+                        <span className="text-[10px] text-[var(--foreground-muted)] w-16">7d Avg</span>
+                        <div className="flex-1 h-3 rounded-full bg-[var(--background-secondary)] overflow-hidden">
+                          <div 
+                            className="h-full rounded-full bg-[#fbbf24]/60 transition-all duration-500"
+                            style={{ width: `${Math.min((timeAnalytics.last7d.avgPing / Math.max(ispPing * 2, timeAnalytics.last7d.avgPing, latest.ping) * 1.1) * 100, 100)}%` }}
+                          />
+                        </div>
+                        <span className="text-[10px] font-medium w-14 text-right">{timeAnalytics.last7d.avgPing.toFixed(0)}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Legend */}
+                <div className="flex items-center justify-center gap-4 pt-2 border-t border-[var(--border)]">
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-3 h-3 rounded-full bg-gradient-to-r from-[#ff7b6b] to-[#f4b8c5]" />
+                    <span className="text-[10px] text-[var(--foreground-muted)]">Current</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-3 h-3 rounded-full bg-[#60a5fa]/60" />
+                    <span className="text-[10px] text-[var(--foreground-muted)]">ISP Baseline</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-3 h-3 rounded-full bg-[#34d399]/60" />
+                    <span className="text-[10px] text-[var(--foreground-muted)]">7-Day Avg</span>
+                  </div>
+                </div>
+              </div>
+            </section>
+          )}
+
+          {/* Sprint 3: Smart Insights Panel */}
+          {smartInsights.length > 0 && (
+            <section className="rounded-3xl border border-[var(--border)] bg-[var(--card)] p-6 shadow-xl">
+              <div className="space-y-1 mb-6">
+                <p className="text-xs uppercase tracking-wider text-[#fbbf24] font-semibold">Smart Insights</p>
+                <h3 className="text-sm text-[var(--foreground-muted)]">AI-powered recommendations</h3>
+              </div>
+              
+              <div className="grid gap-3 sm:grid-cols-2">
+                {smartInsights.map((insight, index) => (
+                  <div 
+                    key={index}
+                    className={`rounded-xl p-4 border transition-all hover:scale-[1.01] ${
+                      insight.type === 'success' ? 'bg-[#34d399]/10 border-[#34d399]/30' :
+                      insight.type === 'warning' ? 'bg-[#fbbf24]/10 border-[#fbbf24]/30' :
+                      insight.type === 'tip' ? 'bg-[#60a5fa]/10 border-[#60a5fa]/30' :
+                      'bg-[var(--background)] border-[var(--border)]'
+                    }`}
+                  >
+                    <div className="flex items-start gap-3">
+                      <span className="text-xl">{insight.icon}</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-sm">{insight.title}</p>
+                        <p className="text-xs text-[var(--foreground-muted)] mt-1 leading-relaxed">{insight.message}</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* Sprint 3: Peak/Off-Peak Analysis */}
+          {peakAnalysis && (
+            <section className="rounded-3xl border border-[var(--border)] bg-[var(--card)] p-6 shadow-xl">
+              <div className="space-y-1 mb-6">
+                <p className="text-xs uppercase tracking-wider text-[#34d399] font-semibold">Peak Analysis</p>
+                <h3 className="text-sm text-[var(--foreground-muted)]">Best times to use your connection</h3>
+              </div>
+              
+              <div className="grid gap-4 sm:grid-cols-2">
+                {/* Best/Worst Time Cards */}
+                <div className="rounded-xl bg-[#34d399]/10 border border-[#34d399]/30 p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-lg">🚀</span>
+                    <span className="text-xs font-semibold text-[#34d399] uppercase tracking-wider">Best Time</span>
+                  </div>
+                  <p className="text-2xl font-bold">
+                    {peakAnalysis.bestHour.hour % 12 || 12}:00 {peakAnalysis.bestHour.hour >= 12 ? 'PM' : 'AM'}
+                  </p>
+                  <p className="text-xs text-[var(--foreground-muted)] mt-1">
+                    Avg {peakAnalysis.bestHour.avgDown.toFixed(0)} Mbps ({peakAnalysis.bestHour.testCount} tests)
+                  </p>
+                </div>
+                
+                <div className="rounded-xl bg-[#ff7b6b]/10 border border-[#ff7b6b]/30 p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-lg">🐢</span>
+                    <span className="text-xs font-semibold text-[#ff7b6b] uppercase tracking-wider">Slowest Time</span>
+                  </div>
+                  <p className="text-2xl font-bold">
+                    {peakAnalysis.worstHour.hour % 12 || 12}:00 {peakAnalysis.worstHour.hour >= 12 ? 'PM' : 'AM'}
+                  </p>
+                  <p className="text-xs text-[var(--foreground-muted)] mt-1">
+                    Avg {peakAnalysis.worstHour.avgDown.toFixed(0)} Mbps ({peakAnalysis.worstHour.testCount} tests)
+                  </p>
+                </div>
+              </div>
+
+              {/* Time Period Breakdown */}
+              <div className="mt-4 pt-4 border-t border-[var(--border)]">
+                <p className="text-xs text-[var(--foreground-muted)] mb-3">Speed by Time of Day</p>
+                <div className="grid grid-cols-4 gap-2">
+                  {[
+                    { label: '🌅 Morning', value: peakAnalysis.periodAverages.morning, period: '6AM-12PM' },
+                    { label: '☀️ Afternoon', value: peakAnalysis.periodAverages.afternoon, period: '12PM-6PM' },
+                    { label: '🌆 Evening', value: peakAnalysis.periodAverages.evening, period: '6PM-10PM' },
+                    { label: '🌙 Night', value: peakAnalysis.periodAverages.night, period: '10PM-6AM' },
+                  ].map((period) => (
+                    <div key={period.label} className="text-center rounded-lg bg-[var(--background)] p-3 border border-[var(--border)]">
+                      <p className="text-xs mb-1">{period.label}</p>
+                      <p className="text-lg font-bold">{period.value > 0 ? period.value.toFixed(0) : '—'}</p>
+                      <p className="text-[10px] text-[var(--foreground-muted)]">{period.value > 0 ? 'Mbps' : 'No data'}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </section>
+          )}
+
+          {/* Sprint 3: Anomaly Detection */}
+          {anomalies.length > 0 && (
+            <section className="rounded-3xl border border-[#fbbf24]/30 bg-[#fbbf24]/5 p-6 shadow-xl">
+              <div className="space-y-1 mb-6">
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">⚠️</span>
+                  <p className="text-xs uppercase tracking-wider text-[#fbbf24] font-semibold">Anomalies Detected</p>
+                </div>
+                <h3 className="text-sm text-[var(--foreground-muted)]">Unusual patterns in your test history</h3>
+              </div>
+              
+              <div className="space-y-2">
+                {anomalies.map((anomaly, index) => (
+                  <div 
+                    key={index}
+                    className={`flex items-center gap-3 rounded-xl p-3 border ${
+                      anomaly.severity === 'critical' 
+                        ? 'bg-[#ff7b6b]/10 border-[#ff7b6b]/30' 
+                        : 'bg-[#fbbf24]/10 border-[#fbbf24]/30'
+                    }`}
+                  >
+                    <span className={`text-sm ${anomaly.severity === 'critical' ? 'text-[#ff7b6b]' : 'text-[#fbbf24]'}`}>
+                      {anomaly.severity === 'critical' ? '🔴' : '🟡'}
+                    </span>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium">{anomaly.message}</p>
+                      <p className="text-xs text-[var(--foreground-muted)]">
+                        {new Date(anomaly.timestamp).toLocaleDateString()} at {new Date(anomaly.timestamp).toLocaleTimeString()}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
 
           {/* History Section */}
           <section className="space-y-6" id="history-section">
