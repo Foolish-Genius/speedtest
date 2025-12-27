@@ -2504,6 +2504,134 @@ export default function Home() {
             </section>
           )}
 
+          {/* Performance Benchmarks */}
+          {latest && (
+            <section className="rounded-3xl border border-[var(--border)] bg-[var(--card)] p-6 shadow-xl">
+              <div className="space-y-1 mb-6">
+                <p className="text-xs uppercase tracking-wider text-[#a78bfa] font-semibold">Performance Benchmarks</p>
+                <h3 className="text-sm text-[var(--foreground-muted)]">How your connection compares to industry standards</h3>
+              </div>
+              
+              {/* Benchmark Categories */}
+              <div className="space-y-4">
+                {[
+                  { 
+                    name: 'HD Streaming (Netflix)', 
+                    required: 5, 
+                    recommended: 25,
+                    icon: '📺',
+                    description: 'Smooth 1080p video streaming'
+                  },
+                  { 
+                    name: '4K Streaming', 
+                    required: 25, 
+                    recommended: 50,
+                    icon: '🎬',
+                    description: 'Ultra HD content without buffering'
+                  },
+                  { 
+                    name: 'Online Gaming', 
+                    required: 10, 
+                    recommended: 25,
+                    icon: '🎮',
+                    description: 'Low latency multiplayer gaming'
+                  },
+                  { 
+                    name: 'Video Conferencing', 
+                    required: 3, 
+                    recommended: 15,
+                    icon: '💻',
+                    description: 'HD video calls (Zoom, Meet, Teams)'
+                  },
+                  { 
+                    name: 'Remote Work', 
+                    required: 10, 
+                    recommended: 50,
+                    icon: '🏠',
+                    description: 'Cloud apps, file sync, VPN'
+                  },
+                  { 
+                    name: 'Large File Downloads', 
+                    required: 25, 
+                    recommended: 100,
+                    icon: '📦',
+                    description: 'Software updates, games (50GB+)'
+                  }
+                ].map((benchmark) => {
+                  const currentSpeed = latest.download;
+                  const meetsRequired = currentSpeed >= benchmark.required;
+                  const meetsRecommended = currentSpeed >= benchmark.recommended;
+                  const percentage = Math.min(100, (currentSpeed / benchmark.recommended) * 100);
+                  
+                  return (
+                    <div key={benchmark.name} className="rounded-xl bg-[var(--background)] border border-[var(--border)] p-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg">{benchmark.icon}</span>
+                          <div>
+                            <p className="font-medium text-sm">{benchmark.name}</p>
+                            <p className="text-[10px] text-[var(--foreground-muted)]">{benchmark.description}</p>
+                          </div>
+                        </div>
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
+                          meetsRecommended ? 'bg-[#34d399]/20 text-[#34d399]' :
+                          meetsRequired ? 'bg-[#fbbf24]/20 text-[#fbbf24]' :
+                          'bg-[#ff7b6b]/20 text-[#ff7b6b]'
+                        }`}>
+                          {meetsRecommended ? '✓ Excellent' : meetsRequired ? '~ Adequate' : '✗ Below'}
+                        </span>
+                      </div>
+                      
+                      {/* Progress bar */}
+                      <div className="relative h-2 rounded-full bg-[var(--card)] overflow-hidden">
+                        {/* Required threshold marker */}
+                        <div 
+                          className="absolute top-0 bottom-0 w-0.5 bg-[#fbbf24] z-10"
+                          style={{ left: `${(benchmark.required / benchmark.recommended) * 100}%` }}
+                        />
+                        {/* Progress fill */}
+                        <div 
+                          className={`absolute top-0 left-0 bottom-0 rounded-full transition-all ${
+                            meetsRecommended ? 'bg-[#34d399]' :
+                            meetsRequired ? 'bg-[#fbbf24]' :
+                            'bg-[#ff7b6b]'
+                          }`}
+                          style={{ width: `${Math.min(100, percentage)}%` }}
+                        />
+                      </div>
+                      
+                      <div className="flex justify-between mt-1.5">
+                        <span className="text-[10px] text-[var(--foreground-muted)]">
+                          Required: {benchmark.required} Mbps
+                        </span>
+                        <span className="text-[10px] text-[var(--foreground-muted)]">
+                          Recommended: {benchmark.recommended} Mbps
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              
+              {/* Summary */}
+              <div className="mt-4 pt-4 border-t border-[var(--border)]">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-[var(--foreground-muted)]">Overall Assessment</span>
+                  <span className={`text-sm font-bold ${
+                    latest.download >= 100 ? 'text-[#34d399]' :
+                    latest.download >= 25 ? 'text-[#60a5fa]' :
+                    latest.download >= 10 ? 'text-[#fbbf24]' : 'text-[#ff7b6b]'
+                  }`}>
+                    {latest.download >= 100 ? '🚀 Power User Ready' :
+                     latest.download >= 50 ? '✨ All Activities Supported' :
+                     latest.download >= 25 ? '👍 Most Activities Supported' :
+                     latest.download >= 10 ? '⚠️ Basic Activities Only' : '❌ Limited Capabilities'}
+                  </span>
+                </div>
+              </div>
+            </section>
+          )}
+
           {/* History Section */}
           <section className="space-y-6" id="history-section">
             <div className="flex items-center justify-between">
