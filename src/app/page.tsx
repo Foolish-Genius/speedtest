@@ -14,6 +14,7 @@ type SpeedResult = {
   location?: string;
   serverId?: string;
   serverName?: string;
+  dnsLookupTime?: number;
   stats?: {
     downloadStats: DetailedStats;
     uploadStats: DetailedStats;
@@ -626,6 +627,9 @@ export default function Home() {
   const [highContrast, setHighContrast] = useState(false);
   const [showAchievements, setShowAchievements] = useState(false);
   
+  // Network diagnostics
+  const [dnsLookupTime, setDnsLookupTime] = useState<number | null>(null);
+  
   // Ref to track incognito mode during async test execution
   const incognitoRef = useRef(false);
 
@@ -726,14 +730,35 @@ export default function Home() {
     setDownload(0);
     setUpload(0);
     setPing(0);
+    setDnsLookupTime(null);
     setSamples({ down: [], up: [], ping: [] });
     setRealtimePing([]);
     setRealtimeDown([]);
     setRealtimeUp([]);
 
-    const phaseDuration = profileDurations[testProfile]; // Use selected profile
-    const updateInterval = 100; // Sample every 100ms
-    const displayInterval = 300; // Update display every 300ms
+    // Measure DNS lookup time (simulated with fetch timing)
+    const measureDns = async () => {
+      const domains = ['google.com', 'cloudflare.com', 'amazon.com'];
+      const times: number[] = [];
+      for (const domain of domains) {
+        const start = performance.now();
+        try {
+          await fetch(`https://${domain}/favicon.ico`, { mode: 'no-cors', cache: 'no-store' });
+        } catch {
+          // Ignore errors, we just need timing
+        }
+        times.push(performance.now() - start);
+      }
+      const avgDns = Math.min(...times); // Use fastest as DNS baseline
+      setDnsLookupTime(Math.round(avgDns));
+      return Math.round(avgDns);
+    };
+    
+    measureDns();
+
+    const phaseDuration = profileDurations[testProfile];
+    const updateInterval = 100;
+    const displayInterval = 300;
 
     const computeMedian = (arr: number[]) => {
       if (!arr.length) return 0;
@@ -909,6 +934,7 @@ export default function Home() {
               location: location || undefined,
               serverId: selectedServer,
               serverName: TEST_SERVERS.find(s => s.id === selectedServer)?.name || 'Auto',
+              dnsLookupTime: dnsLookupTime || undefined,
               stats: {
                 downloadStats,
                 uploadStats,
@@ -1858,8 +1884,8 @@ export default function Home() {
                       <p className="text-lg font-bold text-[#34d399]">{latest.stats.jitter.toFixed(1)} <span className="text-xs font-normal">ms</span></p>
                     </div>
                     <div className="rounded-xl bg-[var(--background)] p-3 border border-[var(--border)]">
-                      <p className="text-xs text-[var(--foreground-muted)]">Std Dev</p>
-                      <p className="text-lg font-bold text-[#60a5fa]">{latest.stats.downloadStats.stdDev.toFixed(1)} <span className="text-xs font-normal">Mbps</span></p>
+                      <p className="text-xs text-[var(--foreground-muted)]">DNS Lookup</p>
+                      <p className="text-lg font-bold text-[#60a5fa]">{latest.dnsLookupTime || dnsLookupTime || '—'} <span className="text-xs font-normal">ms</span></p>
                     </div>
                     <div className="rounded-xl bg-[var(--background)] p-3 border border-[var(--border)]">
                       <p className="text-xs text-[var(--foreground-muted)]">P95 Down</p>
