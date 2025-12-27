@@ -10,9 +10,9 @@ export function SpeedLabLogo() {
     >
       <defs>
         <linearGradient id="speedLabGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#F58F7C" />
-          <stop offset="50%" stopColor="#F2A098" />
-          <stop offset="100%" stopColor="#F2C4CE" />
+          <stop offset="0%" stopColor="#3B82F6" />
+          <stop offset="50%" stopColor="#60A5FA" />
+          <stop offset="100%" stopColor="#93C5FD" />
         </linearGradient>
         <linearGradient id="glowGradient" x1="50%" y1="0%" x2="50%" y2="100%">
           <stop offset="0%" stopColor="#fff" stopOpacity="0.3" />

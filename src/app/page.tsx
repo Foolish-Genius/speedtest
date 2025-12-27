@@ -624,7 +624,7 @@ export default function Home() {
   const [selectedServer, setSelectedServer] = useState<string>("auto");
   
   // Accessibility settings
-  const [highContrast, setHighContrast] = useState(false);
+  const [highContrast, setHighContrast] = useState(true);
   const [showAchievements, setShowAchievements] = useState(false);
   
   // Network diagnostics
@@ -671,11 +671,13 @@ export default function Home() {
   // Load theme and high contrast setting on mount
   useEffect(() => {
     const savedTheme = window.localStorage.getItem("speedlabs-theme") || "dark";
-    const savedHighContrast = window.localStorage.getItem("speedlabs-highcontrast") === "true";
+    const savedHighContrast = window.localStorage.getItem("speedlabs-highcontrast");
+    // Default to true if not set
+    const isHighContrast = savedHighContrast === null ? true : savedHighContrast === "true";
     setTheme(savedTheme);
-    setHighContrast(savedHighContrast);
+    setHighContrast(isHighContrast);
     document.documentElement.setAttribute("data-theme", savedTheme);
-    document.documentElement.setAttribute("data-high-contrast", String(savedHighContrast));
+    document.documentElement.setAttribute("data-high-contrast", String(isHighContrast));
   }, []);
 
   useEffect(() => {
