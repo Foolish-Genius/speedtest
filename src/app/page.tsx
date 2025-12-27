@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { SpeedLabLogo } from "@/components/Logo";
 
 type SpeedResult = {
@@ -540,14 +540,17 @@ export default function Home() {
   const [theme, setTheme] = useState<string>("dark");
   const [showResultsModal, setShowResultsModal] = useState(false);
   
-  // Sprint 2: New features
+  // Test configuration
   const [networkType, setNetworkType] = useState<NetworkType>("wifi");
   const [location, setLocation] = useState<string>("");
   const [incognitoMode, setIncognitoMode] = useState(false);
   const [testProfile, setTestProfile] = useState<TestProfile>("standard");
   const [showSettings, setShowSettings] = useState(false);
+  
+  // Ref to track incognito mode during async test execution
+  const incognitoRef = useRef(false);
 
-  // Test profile durations (ms per phase)
+  // Test duration presets (ms per phase)
   const profileDurations: Record<TestProfile, number> = {
     quick: 5000,    // 5 seconds per phase = 15s total
     standard: 10000, // 10 seconds per phase = 30s total
@@ -602,8 +605,13 @@ export default function Home() {
     );
   }, [ispDown, ispUp, ispPing]);
 
-  const startTest = () => {
+  const startTest = (isIncognito: boolean = false) => {
     if (status === "running") return;
+    
+    // Store incognito mode in ref for async access
+    incognitoRef.current = isIncognito;
+    setIncognitoMode(isIncognito);
+    
     setStatus("running");
     setProgress(0);
     setDownload(0);
@@ -807,12 +815,12 @@ export default function Home() {
             setStatus("done");
             setPhase(null);
             
-            // Only save to history if not in incognito mode
-            if (!incognitoMode) {
+            // Save to history (skip if incognito)
+            if (!incognitoRef.current) {
               setHistory((prevHistory) => [result, ...prevHistory].slice(0, 50));
             }
             
-            // Show results modal after a brief delay
+            // Show results modal
             setTimeout(() => setShowResultsModal(true), 300);
 
             return allSamples;
@@ -876,7 +884,7 @@ export default function Home() {
     };
   }, [history]);
 
-  // Sprint 3: Peak/Off-Peak Detection
+  // Analyze test history to find optimal and worst performance times
   const peakAnalysis = useMemo(() => {
     if (history.length < 3) return null;
     
@@ -932,7 +940,7 @@ export default function Home() {
     };
   }, [history]);
 
-  // Sprint 3: Anomaly Detection
+  // Detect unusual speed drops or ping spikes using statistical analysis
   const anomalies = useMemo(() => {
     if (history.length < 5) return [];
     
@@ -991,7 +999,7 @@ export default function Home() {
     return detected.slice(0, 5); // Return top 5 anomalies
   }, [history]);
 
-  // Sprint 3: Smart Insights Generation
+  // Generate actionable recommendations based on test patterns
   const smartInsights = useMemo(() => {
     const insights: { icon: string; title: string; message: string; type: 'tip' | 'warning' | 'success' | 'info' }[] = [];
     
@@ -1177,7 +1185,7 @@ export default function Home() {
         isOpen={showResultsModal} 
         onClose={() => setShowResultsModal(false)} 
         result={latest}
-        onRunAgain={startTest}
+        onRunAgain={() => startTest(false)}
       />
       
       <div className="relative overflow-hidden">
@@ -1407,10 +1415,10 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* Start Buttons - Split into Regular and Incognito */}
+              {/* Test Buttons */}
               <div className="flex gap-2">
                 <button
-                  onClick={() => { setIncognitoMode(false); startTest(); }}
+                  onClick={() => startTest(false)}
                   disabled={running}
                   className="group relative overflow-hidden rounded-full bg-gradient-to-r from-[#ff7b6b] to-[#f4b8c5] px-5 py-3 font-semibold text-white shadow-2xl transition-all duration-300 hover:scale-[1.02] hover:shadow-[0_20px_40px_rgba(255,123,107,0.3)] disabled:cursor-not-allowed disabled:opacity-60 disabled:scale-100 text-sm ripple flex-1"
                 >
@@ -1436,7 +1444,7 @@ export default function Home() {
                   </span>
                 </button>
                 <button
-                  onClick={() => { setIncognitoMode(true); startTest(); }}
+                  onClick={() => startTest(true)}
                   disabled={running}
                   title="Run test without saving to history"
                   className="group relative overflow-hidden rounded-full bg-[var(--background-secondary)] border border-[var(--border)] px-4 py-3 font-semibold text-[var(--foreground)] transition-all duration-300 hover:scale-[1.02] hover:bg-[var(--card)] disabled:cursor-not-allowed disabled:opacity-60 disabled:scale-100 text-sm"
@@ -1640,7 +1648,7 @@ export default function Home() {
             </div>
           </section>
 
-          {/* Sprint 3: Speed Comparison Bars */}
+          {/* Speed Comparison: Current vs Baseline vs Average */}
           {latest && (
             <section className="rounded-3xl border border-[var(--border)] bg-[var(--card)] p-6 shadow-xl">
               <div className="space-y-1 mb-6">
@@ -1794,7 +1802,7 @@ export default function Home() {
             </section>
           )}
 
-          {/* Sprint 3: Smart Insights Panel */}
+          {/* AI-Powered Recommendations */}
           {smartInsights.length > 0 && (
             <section className="rounded-3xl border border-[var(--border)] bg-[var(--card)] p-6 shadow-xl">
               <div className="space-y-1 mb-6">
@@ -1826,7 +1834,7 @@ export default function Home() {
             </section>
           )}
 
-          {/* Sprint 3: Peak/Off-Peak Analysis */}
+          {/* Peak/Off-Peak Performance Analysis */}
           {peakAnalysis && (
             <section className="rounded-3xl border border-[var(--border)] bg-[var(--card)] p-6 shadow-xl">
               <div className="space-y-1 mb-6">
@@ -1884,7 +1892,7 @@ export default function Home() {
             </section>
           )}
 
-          {/* Sprint 3: Anomaly Detection */}
+          {/* Anomaly Alerts */}
           {anomalies.length > 0 && (
             <section className="rounded-3xl border border-[#fbbf24]/30 bg-[#fbbf24]/5 p-6 shadow-xl">
               <div className="space-y-1 mb-6">
@@ -2062,7 +2070,7 @@ export default function Home() {
             onClose={() => setShowResultsModal(false)}
             onRunAgain={() => {
               setShowResultsModal(false);
-              startTest();
+              startTest(false);
             }}
           />
         )}
