@@ -9,6 +9,8 @@ type SpeedResult = {
   download: number;
   upload: number;
   ping: number;
+  networkType?: NetworkType;
+  location?: string;
   stats?: {
     downloadStats: DetailedStats;
     uploadStats: DetailedStats;
@@ -19,6 +21,9 @@ type SpeedResult = {
     trendSlope: number;
   };
 };
+
+type NetworkType = "wifi" | "ethernet" | "mobile" | "unknown";
+type TestProfile = "quick" | "standard" | "extended";
 
 type DetailedStats = {
   mean: number;
@@ -533,6 +538,20 @@ export default function Home() {
   const [realtimeUp, setRealtimeUp] = useState<number[]>([]);
   const [theme, setTheme] = useState<string>("dark");
   const [showResultsModal, setShowResultsModal] = useState(false);
+  
+  // Sprint 2: New features
+  const [networkType, setNetworkType] = useState<NetworkType>("wifi");
+  const [location, setLocation] = useState<string>("");
+  const [incognitoMode, setIncognitoMode] = useState(false);
+  const [testProfile, setTestProfile] = useState<TestProfile>("standard");
+  const [showSettings, setShowSettings] = useState(false);
+
+  // Test profile durations (ms per phase)
+  const profileDurations: Record<TestProfile, number> = {
+    quick: 5000,    // 5 seconds per phase = 15s total
+    standard: 10000, // 10 seconds per phase = 30s total
+    extended: 20000, // 20 seconds per phase = 60s total
+  };
 
   // Theme effect
   useEffect(() => {
@@ -591,7 +610,7 @@ export default function Home() {
     setRealtimeDown([]);
     setRealtimeUp([]);
 
-    const phaseDuration = 10000; // 10 seconds per phase
+    const phaseDuration = profileDurations[testProfile]; // Use selected profile
     const updateInterval = 100; // Sample every 100ms
     const displayInterval = 300; // Update display every 300ms
 
@@ -765,6 +784,8 @@ export default function Home() {
               download: Math.round(downloadStats.median * 10) / 10,
               upload: Math.round(uploadStats.median * 10) / 10,
               ping: Math.round(pingStats.median),
+              networkType: networkType,
+              location: location || undefined,
               stats: {
                 downloadStats,
                 uploadStats,
@@ -781,7 +802,11 @@ export default function Home() {
             setPing(result.ping);
             setStatus("done");
             setPhase(null);
-            setHistory((prevHistory) => [result, ...prevHistory].slice(0, 8));
+            
+            // Only save to history if not in incognito mode
+            if (!incognitoMode) {
+              setHistory((prevHistory) => [result, ...prevHistory].slice(0, 8));
+            }
             
             // Show results modal after a brief delay
             setTimeout(() => setShowResultsModal(true), 300);
@@ -1154,6 +1179,102 @@ export default function Home() {
                   )}
                 </span>
               </button>
+
+              {/* Test Options Toggle */}
+              <button
+                onClick={() => setShowSettings(!showSettings)}
+                className="flex items-center justify-center gap-2 text-xs text-[var(--foreground-muted)] hover:text-[var(--foreground)] transition-colors"
+              >
+                <svg className={`w-4 h-4 transition-transform ${showSettings ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+                Test Options
+              </button>
+
+              {/* Test Options Panel */}
+              {showSettings && (
+                <div className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-4 space-y-4">
+                  {/* Test Profile */}
+                  <div>
+                    <label className="text-xs text-[var(--foreground-muted)] uppercase tracking-wider mb-2 block">Test Duration</label>
+                    <div className="flex gap-1">
+                      {(['quick', 'standard', 'extended'] as TestProfile[]).map((profile) => (
+                        <button
+                          key={profile}
+                          onClick={() => setTestProfile(profile)}
+                          disabled={running}
+                          className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium transition-all ${
+                            testProfile === profile
+                              ? 'bg-gradient-to-r from-[#ff7b6b] to-[#f4b8c5] text-white'
+                              : 'bg-[var(--background)] text-[var(--foreground-muted)] hover:text-[var(--foreground)]'
+                          } disabled:opacity-50`}
+                        >
+                          {profile === 'quick' ? '15s' : profile === 'standard' ? '30s' : '60s'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Network Type */}
+                  <div>
+                    <label className="text-xs text-[var(--foreground-muted)] uppercase tracking-wider mb-2 block">Network Type</label>
+                    <div className="flex gap-1">
+                      {(['wifi', 'ethernet', 'mobile'] as NetworkType[]).map((type) => (
+                        <button
+                          key={type}
+                          onClick={() => setNetworkType(type)}
+                          disabled={running}
+                          className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium transition-all flex items-center justify-center gap-1 ${
+                            networkType === type
+                              ? 'bg-gradient-to-r from-[#ff7b6b] to-[#f4b8c5] text-white'
+                              : 'bg-[var(--background)] text-[var(--foreground-muted)] hover:text-[var(--foreground)]'
+                          } disabled:opacity-50`}
+                        >
+                          {type === 'wifi' && '📶'}
+                          {type === 'ethernet' && '🔌'}
+                          {type === 'mobile' && '📱'}
+                          <span className="capitalize">{type}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Location Tag */}
+                  <div>
+                    <label className="text-xs text-[var(--foreground-muted)] uppercase tracking-wider mb-2 block">Location Tag</label>
+                    <input
+                      type="text"
+                      value={location}
+                      onChange={(e) => setLocation(e.target.value)}
+                      placeholder="e.g., Home Office, Living Room"
+                      disabled={running}
+                      className="w-full px-3 py-2 rounded-lg bg-[var(--background)] border border-[var(--border)] text-sm placeholder:text-[var(--foreground-muted)]/50 focus:outline-none focus:border-[#ff7b6b] transition-colors disabled:opacity-50"
+                    />
+                  </div>
+
+                  {/* Incognito Mode */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="text-base">🕵️</span>
+                      <div>
+                        <p className="text-xs font-medium">Incognito Mode</p>
+                        <p className="text-[10px] text-[var(--foreground-muted)]">Don&apos;t save to history</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setIncognitoMode(!incognitoMode)}
+                      disabled={running}
+                      className={`relative w-11 h-6 rounded-full transition-colors ${
+                        incognitoMode ? 'bg-[#ff7b6b]' : 'bg-[var(--background-secondary)]'
+                      } disabled:opacity-50`}
+                    >
+                      <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform ${
+                        incognitoMode ? 'translate-x-6' : 'translate-x-1'
+                      }`} />
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </header>
 
@@ -1299,9 +1420,21 @@ export default function Home() {
                 {history.slice(0, 6).map((result) => (
                   <div key={result.id} className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-5 card-hover">
                     <div className="flex items-center justify-between mb-3">
-                      <span className="text-xs text-[var(--foreground-muted)]">{new Date(result.timestamp).toLocaleTimeString()}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-[var(--foreground-muted)]">{new Date(result.timestamp).toLocaleTimeString()}</span>
+                        {result.networkType && (
+                          <span className="text-xs">
+                            {result.networkType === 'wifi' && '📶'}
+                            {result.networkType === 'ethernet' && '🔌'}
+                            {result.networkType === 'mobile' && '📱'}
+                          </span>
+                        )}
+                      </div>
                       <span className="text-lg font-bold">{result.stats?.grade || "—"}</span>
                     </div>
+                    {result.location && (
+                      <p className="text-[10px] text-[var(--foreground-muted)] mb-2 truncate">📍 {result.location}</p>
+                    )}
                     <div className="grid grid-cols-3 gap-2 text-center">
                       <div>
                         <p className="text-lg font-bold text-[#ff7b6b]">{result.download.toFixed(1)}</p>
