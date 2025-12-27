@@ -12,7 +12,7 @@
 
 # testing
 /coverage
-
+FEATURE_IDEAS.md
 # next.js
 /.next/
 /out/

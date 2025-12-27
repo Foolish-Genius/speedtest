@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { SpeedLabLogo } from "@/components/Logo";
 
 type SpeedResult = {
   id: string;
@@ -41,6 +42,7 @@ const buildSparkPath = (values: number[], width = 320, height = 90) => {
 
 export default function Home() {
   const [status, setStatus] = useState<"idle" | "running" | "done">("idle");
+  const [phase, setPhase] = useState<"ping" | "download" | "upload" | null>(null);
   const [progress, setProgress] = useState(0);
   const [download, setDownload] = useState(0);
   const [upload, setUpload] = useState(0);
@@ -50,6 +52,10 @@ export default function Home() {
   const [ispUp, setIspUp] = useState(50);
   const [ispPing, setIspPing] = useState(15);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [samples, setSamples] = useState<{ down: number[]; up: number[]; ping: number[] }>({ down: [], up: [], ping: [] });
+  const [realtimePing, setRealtimePing] = useState<number[]>([]);
+  const [realtimeDown, setRealtimeDown] = useState<number[]>([]);
+  const [realtimeUp, setRealtimeUp] = useState<number[]>([]);
 
   useEffect(() => {
     const stored = window.localStorage.getItem("speedtest-history");
@@ -91,55 +97,147 @@ export default function Home() {
     setDownload(0);
     setUpload(0);
     setPing(0);
+    setSamples({ down: [], up: [], ping: [] });
+    setRealtimePing([]);
+    setRealtimeDown([]);
+    setRealtimeUp([]);
 
-    const totalMs = 3000;
-    const start = performance.now();
-    let lastUpdate = start;
-    const updateInterval = 30; // Batch updates every 30ms to prevent glitching
+    const phaseDuration = 10000; // 10 seconds per phase
+    const updateInterval = 300; // Update every 300ms
+    const sampleInterval = 300; // Sample every 300ms
 
-    const step = (now: DOMHighResTimeStamp) => {
-      const elapsed = now - start;
-      const nextProgress = Math.min(100, (elapsed / totalMs) * 100);
-
-      // Only update state every 30ms
-      if (now - lastUpdate >= updateInterval || nextProgress >= 100) {
-        lastUpdate = now;
-        const ease = (t: number) => 1 - Math.pow(1 - t, 3);
-        const eased = ease(nextProgress / 100);
-        const simulatedDownload = 30 + Math.random() * 220;
-        const simulatedUpload = 15 + Math.random() * 90;
-        const simulatedPing = 8 + Math.random() * 22;
-
-        setProgress(nextProgress);
-        setDownload(simulatedDownload * eased);
-        setUpload(simulatedUpload * eased);
-        setPing(simulatedPing + (1 - eased) * 10);
-      }
-
-      if (nextProgress < 100) {
-        requestAnimationFrame(step);
-      } else {
-        const finalDownload = Number((80 + Math.random() * 220).toFixed(1));
-        const finalUpload = Number((30 + Math.random() * 120).toFixed(1));
-        const finalPing = Number((7 + Math.random() * 18).toFixed(0));
-
-        const result: SpeedResult = {
-          id: crypto.randomUUID(),
-          timestamp: Date.now(),
-          download: finalDownload,
-          upload: finalUpload,
-          ping: finalPing,
-        };
-
-        setDownload(result.download);
-        setUpload(result.upload);
-        setPing(result.ping);
-        setStatus("done");
-        setHistory((prev) => [result, ...prev].slice(0, 8));
-      }
+    const computeMedian = (arr: number[]) => {
+      if (!arr.length) return 0;
+      const sorted = [...arr].sort((a, b) => a - b);
+      const mid = Math.floor(sorted.length / 2);
+      return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
     };
 
-    requestAnimationFrame(step);
+    // Phase 1: Ping test
+    const runPingPhase = () => {
+      setPhase("ping");
+      const phaseStart = performance.now();
+      let lastUpdate = phaseStart;
+      const pingSamples: number[] = [];
+
+      const step = (now: DOMHighResTimeStamp) => {
+        const elapsed = now - phaseStart;
+        const phaseProgress = Math.min(100, (elapsed / phaseDuration) * 100);
+
+        if (now - lastUpdate >= updateInterval || phaseProgress >= 100) {
+          lastUpdate = now;
+          const simulatedPing = 5 + Math.random() * 25;
+          pingSamples.push(simulatedPing);
+          
+          // Show average of last few samples for smoother display
+          const recent = pingSamples.slice(-3);
+          const avg = recent.reduce((a, b) => a + b, 0) / recent.length;
+          setPing(avg);
+          setRealtimePing([...pingSamples]);
+          setProgress(phaseProgress / 3); // 0-33%
+        }
+
+        if (phaseProgress < 100) {
+          requestAnimationFrame(step);
+        } else {
+          setSamples((prev) => ({ ...prev, ping: pingSamples }));
+          runDownloadPhase();
+        }
+      };
+      requestAnimationFrame(step);
+    };
+
+    // Phase 2: Download test
+    const runDownloadPhase = () => {
+      setPhase("download");
+      const phaseStart = performance.now();
+      let lastUpdate = phaseStart;
+      const downloadSamples: number[] = [];
+
+      const step = (now: DOMHighResTimeStamp) => {
+        const elapsed = now - phaseStart;
+        const phaseProgress = Math.min(100, (elapsed / phaseDuration) * 100);
+
+        if (now - lastUpdate >= updateInterval || phaseProgress >= 100) {
+          lastUpdate = now;
+          const simulatedDownload = 60 + Math.random() * 200;
+          downloadSamples.push(simulatedDownload);
+          
+          // Show average of last few samples for smoother display
+          const recent = downloadSamples.slice(-3);
+          const avg = recent.reduce((a, b) => a + b, 0) / recent.length;
+          setDownload(avg);
+          setRealtimeDown([...downloadSamples]);
+          setProgress(33.33 + phaseProgress / 3); // 33-66%
+        }
+
+        if (phaseProgress < 100) {
+          requestAnimationFrame(step);
+        } else {
+          setSamples((prev) => ({ ...prev, down: downloadSamples }));
+          runUploadPhase();
+        }
+      };
+      requestAnimationFrame(step);
+    };
+
+    // Phase 3: Upload test
+    const runUploadPhase = () => {
+      setPhase("upload");
+      const phaseStart = performance.now();
+      let lastUpdate = phaseStart;
+      const uploadSamples: number[] = [];
+
+      const step = (now: DOMHighResTimeStamp) => {
+        const elapsed = now - phaseStart;
+        const phaseProgress = Math.min(100, (elapsed / phaseDuration) * 100);
+
+        if (now - lastUpdate >= updateInterval || phaseProgress >= 100) {
+          lastUpdate = now;
+          const simulatedUpload = 20 + Math.random() * 110;
+          uploadSamples.push(simulatedUpload);
+          
+          // Show average of last few samples for smoother display
+          const recent = uploadSamples.slice(-3);
+          const avg = recent.reduce((a, b) => a + b, 0) / recent.length;
+          setUpload(avg);
+          setRealtimeUp([...uploadSamples]);
+          setProgress(66.66 + phaseProgress / 3); // 66-100%
+        }
+
+        if (phaseProgress < 100) {
+          requestAnimationFrame(step);
+        } else {
+          // All phases complete
+          setSamples((prev) => {
+            const allSamples = { ...prev, up: uploadSamples };
+            const finalPing = computeMedian(allSamples.ping);
+            const finalDownload = computeMedian(allSamples.down);
+            const finalUpload = computeMedian(allSamples.up);
+
+            const result: SpeedResult = {
+              id: crypto.randomUUID(),
+              timestamp: Date.now(),
+              download: Math.round(finalDownload * 10) / 10,
+              upload: Math.round(finalUpload * 10) / 10,
+              ping: Math.round(finalPing),
+            };
+
+            setDownload(result.download);
+            setUpload(result.upload);
+            setPing(result.ping);
+            setStatus("done");
+            setPhase(null);
+            setHistory((prevHistory) => [result, ...prevHistory].slice(0, 8));
+
+            return allSamples;
+          });
+        }
+      };
+      requestAnimationFrame(step);
+    };
+
+    runPingPhase();
   };
 
   const running = status === "running";
@@ -149,7 +247,7 @@ export default function Home() {
     ? {
         downDelta: latest.download - ispDown,
         upDelta: latest.upload - ispUp,
-        pingDelta: ispPing - latest.ping,
+        pingDelta: latest.ping - ispPing, // Positive means worse (higher ping), negative means better (lower ping)
       }
     : null;
 
@@ -173,14 +271,38 @@ export default function Home() {
         {/* Navbar */}
         <nav className="relative border-b border-white/10 bg-black/20 backdrop-blur-md">
           <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4 sm:px-10 md:px-14">
-            <div className="flex items-center gap-2">
-              <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-[#F58F7C] to-[#F2C4CE]" />
+            <div className="flex items-center gap-3">
+              <SpeedLabLogo />
               <span className="text-lg font-bold text-white">Speed Lab</span>
             </div>
             <div className="hidden gap-8 md:flex">
-              <button className="text-sm text-[#D6D6D6] hover:text-white transition-colors">Test</button>
-              <button className="text-sm text-[#D6D6D6] hover:text-white transition-colors">History</button>
-              <button className="text-sm text-[#D6D6D6] hover:text-white transition-colors">Baseline</button>
+              <button 
+                onClick={() => {
+                  const testSection = document.getElementById("test-section");
+                  testSection?.scrollIntoView({ behavior: "smooth" });
+                }}
+                className="text-sm text-[#D6D6D6] hover:text-[#F58F7C] transition-colors font-medium"
+              >
+                Test
+              </button>
+              <button 
+                onClick={() => {
+                  const historySection = document.getElementById("history-section");
+                  historySection?.scrollIntoView({ behavior: "smooth" });
+                }}
+                className="text-sm text-[#D6D6D6] hover:text-[#F58F7C] transition-colors font-medium"
+              >
+                History
+              </button>
+              <button 
+                onClick={() => {
+                  const baselineSection = document.getElementById("baseline-section");
+                  baselineSection?.scrollIntoView({ behavior: "smooth" });
+                }}
+                className="text-sm text-[#D6D6D6] hover:text-[#F58F7C] transition-colors font-medium"
+              >
+                Baseline
+              </button>
             </div>
             <button
               className="relative md:hidden"
@@ -196,9 +318,36 @@ export default function Home() {
           {menuOpen && (
             <div className="border-t border-white/10 bg-black/40 px-6 py-4 md:hidden">
               <div className="flex flex-col gap-3">
-                <button className="text-sm text-[#D6D6D6] hover:text-white transition-colors text-left">Test</button>
-                <button className="text-sm text-[#D6D6D6] hover:text-white transition-colors text-left">History</button>
-                <button className="text-sm text-[#D6D6D6] hover:text-white transition-colors text-left">Baseline</button>
+                <button 
+                  onClick={() => {
+                    const testSection = document.getElementById("test-section");
+                    testSection?.scrollIntoView({ behavior: "smooth" });
+                    setMenuOpen(false);
+                  }}
+                  className="text-sm text-[#D6D6D6] hover:text-[#F58F7C] transition-colors text-left font-medium"
+                >
+                  Test
+                </button>
+                <button 
+                  onClick={() => {
+                    const historySection = document.getElementById("history-section");
+                    historySection?.scrollIntoView({ behavior: "smooth" });
+                    setMenuOpen(false);
+                  }}
+                  className="text-sm text-[#D6D6D6] hover:text-[#F58F7C] transition-colors text-left font-medium"
+                >
+                  History
+                </button>
+                <button 
+                  onClick={() => {
+                    const baselineSection = document.getElementById("baseline-section");
+                    baselineSection?.scrollIntoView({ behavior: "smooth" });
+                    setMenuOpen(false);
+                  }}
+                  className="text-sm text-[#D6D6D6] hover:text-[#F58F7C] transition-colors text-left font-medium"
+                >
+                  Baseline
+                </button>
               </div>
             </div>
           )}
@@ -239,55 +388,125 @@ export default function Home() {
           </header>
 
           {/* Test section */}
-          <section className="grid gap-8 lg:grid-cols-[1.5fr,1fr]">
+          <section className="grid gap-8 lg:grid-cols-[1.5fr,1fr]" id="test-section">
             {/* Main test card */}
-            <div className="flex flex-col gap-6 rounded-3xl border border-white/15 bg-gradient-to-br from-white/8 to-white/5 p-8 shadow-2xl backdrop-blur-xl">
+            <div className="flex flex-col gap-6 rounded-3xl border border-white/15 bg-gradient-to-br from-white/10 via-white/5 to-transparent p-8 shadow-2xl backdrop-blur-xl">
               <div className="flex flex-col gap-3">
                 <div className="flex items-center gap-3">
-                  <span className="text-3xl font-bold text-white">{status === "running" ? "Testing..." : status === "done" ? "Complete" : "Ready"}</span>
+                  <div className={`h-3 w-3 rounded-full transition-all ${running ? "bg-[#F58F7C] animate-pulse" : status === "done" ? "bg-emerald-400" : "bg-[#D6D6D6]/50"}`} />
+                  <span className="text-3xl font-bold text-white">
+                    {status === "running" && phase === "ping" && "Testing Ping..."}
+                    {status === "running" && phase === "download" && "Testing Download..."}
+                    {status === "running" && phase === "upload" && "Testing Upload..."}
+                    {status === "done" && "Complete"}
+                    {status === "idle" && "Ready"}
+                  </span>
                 </div>
                 <p className="text-sm text-[#D6D6D6]/80">
-                  {status === "idle" && "Click the button below to begin your network test."}
-                  {status === "running" && "Measuring your connection performance..."}
-                  {status === "done" && "Test finished. Review your results above."}
+                  {status === "idle" && "Click the button below to begin your network test. Takes about 30 seconds."}
+                  {status === "running" && phase === "ping" && "Phase 1 of 3: Measuring latency to server..."}
+                  {status === "running" && phase === "download" && "Phase 2 of 3: Measuring download throughput..."}
+                  {status === "running" && phase === "upload" && "Phase 3 of 3: Measuring upload throughput..."}
+                  {status === "done" && "Test finished! Results are based on median values for accuracy."}
                 </p>
               </div>
 
               <button
                 onClick={startTest}
                 disabled={running}
-                className="group relative overflow-hidden rounded-full bg-gradient-to-r from-[#F58F7C] to-[#F2C4CE] px-8 py-4 font-semibold text-[#2C2B30] shadow-xl transition-all duration-200 hover:scale-[1.02] hover:shadow-2xl disabled:cursor-not-allowed disabled:opacity-60 disabled:scale-100"
+                className="group relative overflow-hidden rounded-full bg-gradient-to-r from-[#F58F7C] to-[#F2C4CE] px-8 py-4 font-semibold text-[#2C2B30] shadow-2xl transition-all duration-300 hover:scale-[1.03] hover:shadow-[0_20px_40px_rgba(245,143,124,0.3)] disabled:cursor-not-allowed disabled:opacity-60 disabled:scale-100"
               >
-                <span className="relative z-10">{running ? "Running test..." : status === "done" ? "Run again" : "Start test"}</span>
-                <div className="absolute inset-0 scale-110 bg-white/20 opacity-0 transition-opacity duration-200 group-hover:opacity-100" aria-hidden />
+                <span className="relative z-10 flex items-center gap-2">
+                  {!running && !status === "done" && "▶"}
+                  {running ? "Running test..." : status === "done" ? "Run again" : "Start test"}
+                </span>
+                <div className="absolute inset-0 scale-110 bg-white/20 opacity-0 transition-opacity duration-300 group-hover:opacity-100" aria-hidden />
               </button>
+
+              {/* Real-time phase graph (single view) */}
+              <div className="mt-6 rounded-2xl border border-white/15 bg-gradient-to-br from-black/40 to-black/20 p-5">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <span className={`h-2.5 w-2.5 rounded-full ${running ? "animate-pulse" : ""} ${phase === "ping" ? "bg-emerald-400" : phase === "download" ? "bg-[#F58F7C]" : phase === "upload" ? "bg-[#F2C4CE]" : "bg-white/30"}`} />
+                    <p className="text-sm font-semibold text-white">
+                      {phase === "ping" && "⏱ Ping Latency"}
+                      {phase === "download" && "↓ Download Speed"}
+                      {phase === "upload" && "↑ Upload Speed"}
+                      {!phase && "Test Progress"}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    {((phase === "ping" && realtimePing.length > 0) || 
+                      (phase === "download" && realtimeDown.length > 0) || 
+                      (phase === "upload" && realtimeUp.length > 0)) && (
+                      <p className="text-xs text-white/60">
+                        {phase === "ping" && `${realtimePing.length} samples`}
+                        {phase === "download" && `${realtimeDown.length} samples`}
+                        {phase === "upload" && `${realtimeUp.length} samples`}
+                      </p>
+                    )}
+                    <p className="text-sm font-bold text-[#F58F7C]">{Math.round(progress)}%</p>
+                  </div>
+                </div>
+                
+                <svg viewBox="0 0 400 50" className="w-full h-14">
+                  {phase === "ping" && realtimePing.length > 0 && (
+                    <path
+                      d={buildSparkPath(realtimePing, 400, 50)}
+                      fill="none"
+                      stroke="#34d399"
+                      strokeWidth="2.5"
+                      strokeLinejoin="round"
+                      strokeLinecap="round"
+                      className="drop-shadow-[0_2px_8px_rgba(52,211,153,0.5)]"
+                    />
+                  )}
+                  {phase === "download" && realtimeDown.length > 0 && (
+                    <path
+                      d={buildSparkPath(realtimeDown, 400, 50)}
+                      fill="none"
+                      stroke="#F58F7C"
+                      strokeWidth="2.5"
+                      strokeLinejoin="round"
+                      strokeLinecap="round"
+                      className="drop-shadow-[0_2px_8px_rgba(245,143,124,0.5)]"
+                    />
+                  )}
+                  {phase === "upload" && realtimeUp.length > 0 && (
+                    <path
+                      d={buildSparkPath(realtimeUp, 400, 50)}
+                      fill="none"
+                      stroke="#F2C4CE"
+                      strokeWidth="2.5"
+                      strokeLinejoin="round"
+                      strokeLinecap="round"
+                      className="drop-shadow-[0_2px_8px_rgba(242,196,206,0.5)]"
+                    />
+                  )}
+                  <line x1="0" x2="400" y1="50" y2="50" stroke="rgba(255,255,255,0.08)" strokeWidth="1" />
+                </svg>
+
+                <p className="mt-3 text-xs text-[#D6D6D6]/60 text-center">
+                  {status === "idle" && "Ready to begin • 3 phases • 30 seconds total"}
+                  {status === "running" && `Phase ${phase === "ping" ? "1" : phase === "download" ? "2" : "3"} of 3 • Testing in progress...`}
+                  {status === "done" && "All phases complete • Results calculated using median values"}
+                </p>
+              </div>
 
               <div className="mt-4 grid gap-4 sm:grid-cols-3">
                 {[
-                  { label: "Download", value: formatMbps(download), icon: "↓" },
-                  { label: "Upload", value: formatMbps(upload), icon: "↑" },
-                  { label: "Ping", value: formatMs(ping), icon: "⏱" },
+                  { label: "Download", value: formatMbps(download), icon: "↓", color: "text-[#F58F7C]" },
+                  { label: "Upload", value: formatMbps(upload), icon: "↑", color: "text-[#F2C4CE]" },
+                  { label: "Ping", value: formatMs(ping), icon: "⏱", color: "text-emerald-400" },
                 ].map((item) => (
                   <div
                     key={item.label}
-                    className="flex flex-col gap-2 rounded-2xl border border-white/10 bg-black/30 px-4 py-4"
+                    className="flex flex-col gap-2 rounded-2xl border border-white/10 bg-black/40 px-4 py-4 transition-all hover:bg-black/60 hover:border-white/20"
                   >
                     <p className="text-xs uppercase tracking-wider text-[#D6D6D6]/70 font-medium">{item.icon} {item.label}</p>
-                    <p className="text-2xl font-bold text-white">{item.value}</p>
+                    <p className={`text-2xl font-bold ${item.color}`}>{item.value}</p>
                   </div>
                 ))}
-              </div>
-
-              {/* Progress bar */}
-              <div className="mt-4 space-y-2">
-                <div className="h-2 w-full overflow-hidden rounded-full bg-white/10">
-                  <div
-                    className="h-full bg-gradient-to-r from-[#F58F7C] to-[#F2C4CE] transition-[width] duration-100"
-                    style={{ width: `${progress}%` }}
-                    aria-label="Progress"
-                  />
-                </div>
-                <p className="text-xs text-[#D6D6D6]/60 text-right font-medium">{Math.round(progress)}%</p>
               </div>
             </div>
 
@@ -329,7 +548,7 @@ export default function Home() {
               </div>
 
               {/* History */}
-              <div className="rounded-3xl border border-white/15 bg-gradient-to-br from-white/8 to-white/5 p-6 shadow-2xl backdrop-blur-xl">
+              <div className="rounded-3xl border border-white/15 bg-gradient-to-br from-white/8 to-white/5 p-6 shadow-2xl backdrop-blur-xl" id="history-section">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-xs uppercase tracking-wider text-[#F2C4CE] font-semibold">History</p>
@@ -368,7 +587,7 @@ export default function Home() {
           </section>
 
           {/* Baseline comparator */}
-          <section className="rounded-3xl border border-white/15 bg-gradient-to-br from-white/8 to-white/5 p-8 shadow-2xl backdrop-blur-xl">
+          <section className="rounded-3xl border border-white/15 bg-gradient-to-br from-white/8 to-white/5 p-8 shadow-2xl backdrop-blur-xl" id="baseline-section">
             <div className="grid gap-8 md:grid-cols-[1fr,1.2fr]">
               <div>
                 <p className="text-xs uppercase tracking-wider text-[#F2C4CE] font-semibold">ISP Baseline</p>
@@ -419,7 +638,7 @@ export default function Home() {
                       label: "Ping",
                       delta: baselineCompare.pingDelta,
                       unit: " ms",
-                      betterHigher: false,
+                      betterHigher: false, // For ping, lower is better
                     },
                   ].map((item) => {
                     const isPositive = item.delta >= 0;
@@ -435,7 +654,10 @@ export default function Home() {
                           {sign}{item.delta.toFixed(1)}{item.unit}
                         </p>
                         <p className="text-xs text-[#D6D6D6]/65">
-                          {good ? "✓ On target" : "⚠ Below baseline"}
+                          {item.label === "Ping" 
+                            ? (good ? "✓ Lower than baseline" : "⚠ Higher than baseline")
+                            : (good ? "✓ On target" : "⚠ Below baseline")
+                          }
                         </p>
                       </div>
                     );
