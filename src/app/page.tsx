@@ -2385,191 +2385,136 @@ export default function Home() {
             </section>
           )}
 
-          {/* Speed Comparison: Current vs Baseline vs Average */}
+          {/* Speed Comparison & Smart Insights - Side by Side */}
           {latest && (
-            <section className="rounded-3xl border border-[var(--border)] bg-[var(--card)] p-6 shadow-xl">
-              <div className="space-y-1 mb-6">
-                <p className="text-xs uppercase tracking-wider text-[#60a5fa] font-semibold">Speed Comparison</p>
-                <h3 className="text-sm text-[var(--foreground-muted)]">Current vs Baseline vs Average</h3>
-              </div>
-              
-              <div className="space-y-5">
-                {/* Download Comparison */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-[var(--foreground-muted)]">Download</span>
-                    <span className="text-[#ff7b6b] font-semibold">{latest.download.toFixed(1)} Mbps</span>
+            <section className="grid gap-6 lg:grid-cols-2">
+              {/* Speed Comparison - Vertical Bars */}
+              <div className="rounded-3xl border border-[var(--border)] bg-[var(--card)] p-6 shadow-xl">
+                <div className="space-y-1 mb-4">
+                  <p className="text-xs uppercase tracking-wider text-[#60a5fa] font-semibold">Speed Comparison</p>
+                  <h3 className="text-sm text-[var(--foreground-muted)]">Current vs Baseline</h3>
+                </div>
+                
+                {/* Vertical Bar Chart */}
+                <div className="flex items-end justify-around gap-4 h-40">
+                  {/* Download */}
+                  <div className="flex flex-col items-center gap-2">
+                    <div className="flex gap-1 items-end h-28">
+                      <div className="w-6 rounded-t bg-gradient-to-t from-[#ff7b6b] to-[#ff9d91] transition-all" style={{ height: `${Math.min((latest.download / Math.max(ispDown, latest.download) * 1.1) * 100, 100)}%` }} title={`Current: ${latest.download.toFixed(1)}`} />
+                      <div className="w-6 rounded-t bg-[#60a5fa]/60 transition-all" style={{ height: `${Math.min((ispDown / Math.max(ispDown, latest.download) * 1.1) * 100, 100)}%` }} title={`Baseline: ${ispDown}`} />
+                    </div>
+                    <div className="text-center">
+                      <p className="text-xs font-medium">↓ Down</p>
+                      <p className="text-[10px] text-[var(--foreground-muted)]">{latest.download.toFixed(0)} Mbps</p>
+                    </div>
                   </div>
-                  <div className="space-y-1.5">
-                    <div className="flex items-center gap-3">
-                      <span className="text-[10px] text-[var(--foreground-muted)] w-16">Current</span>
-                      <div className="flex-1 h-3 rounded-full bg-[var(--background-secondary)] overflow-hidden">
-                        <div 
-                          className="h-full rounded-full bg-gradient-to-r from-[#ff7b6b] to-[#ff9d91] transition-all duration-500"
-                          style={{ width: `${Math.min((latest.download / Math.max(ispDown, timeAnalytics?.last7d.avgDown || 1, latest.download) * 1.1) * 100, 100)}%` }}
-                        />
-                      </div>
-                      <span className="text-[10px] font-medium w-14 text-right">{latest.download.toFixed(0)}</span>
+                  
+                  {/* Upload */}
+                  <div className="flex flex-col items-center gap-2">
+                    <div className="flex gap-1 items-end h-28">
+                      <div className="w-6 rounded-t bg-gradient-to-t from-[#f4b8c5] to-[#fad4dd] transition-all" style={{ height: `${Math.min((latest.upload / Math.max(ispUp, latest.upload) * 1.1) * 100, 100)}%` }} />
+                      <div className="w-6 rounded-t bg-[#60a5fa]/60 transition-all" style={{ height: `${Math.min((ispUp / Math.max(ispUp, latest.upload) * 1.1) * 100, 100)}%` }} />
                     </div>
-                    <div className="flex items-center gap-3">
-                      <span className="text-[10px] text-[var(--foreground-muted)] w-16">Baseline</span>
-                      <div className="flex-1 h-3 rounded-full bg-[var(--background-secondary)] overflow-hidden">
-                        <div 
-                          className="h-full rounded-full bg-[#60a5fa]/60 transition-all duration-500"
-                          style={{ width: `${Math.min((ispDown / Math.max(ispDown, timeAnalytics?.last7d.avgDown || 1, latest.download) * 1.1) * 100, 100)}%` }}
-                        />
-                      </div>
-                      <span className="text-[10px] font-medium w-14 text-right">{ispDown}</span>
+                    <div className="text-center">
+                      <p className="text-xs font-medium">↑ Up</p>
+                      <p className="text-[10px] text-[var(--foreground-muted)]">{latest.upload.toFixed(0)} Mbps</p>
                     </div>
-                    {timeAnalytics && timeAnalytics.last7d.count > 0 && (
-                      <div className="flex items-center gap-3">
-                        <span className="text-[10px] text-[var(--foreground-muted)] w-16">7d Avg</span>
-                        <div className="flex-1 h-3 rounded-full bg-[var(--background-secondary)] overflow-hidden">
-                          <div 
-                            className="h-full rounded-full bg-[#34d399]/60 transition-all duration-500"
-                            style={{ width: `${Math.min((timeAnalytics.last7d.avgDown / Math.max(ispDown, timeAnalytics.last7d.avgDown, latest.download) * 1.1) * 100, 100)}%` }}
-                          />
-                        </div>
-                        <span className="text-[10px] font-medium w-14 text-right">{timeAnalytics.last7d.avgDown.toFixed(0)}</span>
-                      </div>
-                    )}
+                  </div>
+                  
+                  {/* Ping */}
+                  <div className="flex flex-col items-center gap-2">
+                    <div className="flex gap-1 items-end h-28">
+                      <div className="w-6 rounded-t bg-gradient-to-t from-[#34d399] to-[#6ee7b7] transition-all" style={{ height: `${Math.min((latest.ping / Math.max(ispPing * 2, latest.ping)) * 100, 100)}%` }} />
+                      <div className="w-6 rounded-t bg-[#60a5fa]/60 transition-all" style={{ height: `${Math.min((ispPing / Math.max(ispPing * 2, latest.ping)) * 100, 100)}%` }} />
+                    </div>
+                    <div className="text-center">
+                      <p className="text-xs font-medium">⏱ Ping</p>
+                      <p className="text-[10px] text-[var(--foreground-muted)]">{latest.ping} ms</p>
+                    </div>
                   </div>
                 </div>
-
-                {/* Upload Comparison */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-[var(--foreground-muted)]">Upload</span>
-                    <span className="text-[#f4b8c5] font-semibold">{latest.upload.toFixed(1)} Mbps</span>
-                  </div>
-                  <div className="space-y-1.5">
-                    <div className="flex items-center gap-3">
-                      <span className="text-[10px] text-[var(--foreground-muted)] w-16">Current</span>
-                      <div className="flex-1 h-3 rounded-full bg-[var(--background-secondary)] overflow-hidden">
-                        <div 
-                          className="h-full rounded-full bg-gradient-to-r from-[#f4b8c5] to-[#fad4dd] transition-all duration-500"
-                          style={{ width: `${Math.min((latest.upload / Math.max(ispUp, timeAnalytics?.last7d.avgUp || 1, latest.upload) * 1.1) * 100, 100)}%` }}
-                        />
-                      </div>
-                      <span className="text-[10px] font-medium w-14 text-right">{latest.upload.toFixed(0)}</span>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <span className="text-[10px] text-[var(--foreground-muted)] w-16">Baseline</span>
-                      <div className="flex-1 h-3 rounded-full bg-[var(--background-secondary)] overflow-hidden">
-                        <div 
-                          className="h-full rounded-full bg-[#60a5fa]/60 transition-all duration-500"
-                          style={{ width: `${Math.min((ispUp / Math.max(ispUp, timeAnalytics?.last7d.avgUp || 1, latest.upload) * 1.1) * 100, 100)}%` }}
-                        />
-                      </div>
-                      <span className="text-[10px] font-medium w-14 text-right">{ispUp}</span>
-                    </div>
-                    {timeAnalytics && timeAnalytics.last7d.count > 0 && (
-                      <div className="flex items-center gap-3">
-                        <span className="text-[10px] text-[var(--foreground-muted)] w-16">7d Avg</span>
-                        <div className="flex-1 h-3 rounded-full bg-[var(--background-secondary)] overflow-hidden">
-                          <div 
-                            className="h-full rounded-full bg-[#34d399]/60 transition-all duration-500"
-                            style={{ width: `${Math.min((timeAnalytics.last7d.avgUp / Math.max(ispUp, timeAnalytics.last7d.avgUp, latest.upload) * 1.1) * 100, 100)}%` }}
-                          />
-                        </div>
-                        <span className="text-[10px] font-medium w-14 text-right">{timeAnalytics.last7d.avgUp.toFixed(0)}</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Ping Comparison */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-[var(--foreground-muted)]">Ping</span>
-                    <span className="text-[#34d399] font-semibold">{latest.ping} ms</span>
-                  </div>
-                  <div className="space-y-1.5">
-                    <div className="flex items-center gap-3">
-                      <span className="text-[10px] text-[var(--foreground-muted)] w-16">Current</span>
-                      <div className="flex-1 h-3 rounded-full bg-[var(--background-secondary)] overflow-hidden">
-                        <div 
-                          className="h-full rounded-full bg-gradient-to-r from-[#34d399] to-[#6ee7b7] transition-all duration-500"
-                          style={{ width: `${Math.min((latest.ping / Math.max(ispPing * 2, timeAnalytics?.last7d.avgPing || 1, latest.ping) * 1.1) * 100, 100)}%` }}
-                        />
-                      </div>
-                      <span className="text-[10px] font-medium w-14 text-right">{latest.ping}</span>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <span className="text-[10px] text-[var(--foreground-muted)] w-16">Baseline</span>
-                      <div className="flex-1 h-3 rounded-full bg-[var(--background-secondary)] overflow-hidden">
-                        <div 
-                          className="h-full rounded-full bg-[#60a5fa]/60 transition-all duration-500"
-                          style={{ width: `${Math.min((ispPing / Math.max(ispPing * 2, timeAnalytics?.last7d.avgPing || 1, latest.ping) * 1.1) * 100, 100)}%` }}
-                        />
-                      </div>
-                      <span className="text-[10px] font-medium w-14 text-right">{ispPing}</span>
-                    </div>
-                    {timeAnalytics && timeAnalytics.last7d.count > 0 && (
-                      <div className="flex items-center gap-3">
-                        <span className="text-[10px] text-[var(--foreground-muted)] w-16">7d Avg</span>
-                        <div className="flex-1 h-3 rounded-full bg-[var(--background-secondary)] overflow-hidden">
-                          <div 
-                            className="h-full rounded-full bg-[#fbbf24]/60 transition-all duration-500"
-                            style={{ width: `${Math.min((timeAnalytics.last7d.avgPing / Math.max(ispPing * 2, timeAnalytics.last7d.avgPing, latest.ping) * 1.1) * 100, 100)}%` }}
-                          />
-                        </div>
-                        <span className="text-[10px] font-medium w-14 text-right">{timeAnalytics.last7d.avgPing.toFixed(0)}</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
+                
                 {/* Legend */}
-                <div className="flex items-center justify-center gap-4 pt-2 border-t border-[var(--border)]">
+                <div className="flex items-center justify-center gap-4 pt-3 mt-3 border-t border-[var(--border)]">
                   <div className="flex items-center gap-1.5">
-                    <div className="w-3 h-3 rounded-full bg-gradient-to-r from-[#ff7b6b] to-[#f4b8c5]" />
+                    <div className="w-3 h-3 rounded bg-gradient-to-r from-[#ff7b6b] to-[#f4b8c5]" />
                     <span className="text-[10px] text-[var(--foreground-muted)]">Current</span>
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <div className="w-3 h-3 rounded-full bg-[#60a5fa]/60" />
-                    <span className="text-[10px] text-[var(--foreground-muted)]">ISP Baseline</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <div className="w-3 h-3 rounded-full bg-[#34d399]/60" />
-                    <span className="text-[10px] text-[var(--foreground-muted)]">7-Day Avg</span>
+                    <div className="w-3 h-3 rounded bg-[#60a5fa]/60" />
+                    <span className="text-[10px] text-[var(--foreground-muted)]">Baseline</span>
                   </div>
                 </div>
+              </div>
+              
+              {/* Smart Insights */}
+              <div className="rounded-3xl border border-[var(--border)] bg-[var(--card)] p-6 shadow-xl">
+                <div className="space-y-1 mb-4">
+                  <p className="text-xs uppercase tracking-wider text-[#fbbf24] font-semibold">Smart Insights</p>
+                  <h3 className="text-sm text-[var(--foreground-muted)]">AI-powered recommendations</h3>
+                </div>
+                
+                {smartInsights.length > 0 ? (
+                  <div className="space-y-2">
+                    {smartInsights.slice(0, 4).map((insight, index) => (
+                      <div 
+                        key={index}
+                        className={`rounded-xl p-3 border transition-all ${
+                          insight.type === 'success' ? 'bg-[#34d399]/10 border-[#34d399]/30' :
+                          insight.type === 'warning' ? 'bg-[#fbbf24]/10 border-[#fbbf24]/30' :
+                          insight.type === 'tip' ? 'bg-[#60a5fa]/10 border-[#60a5fa]/30' :
+                          'bg-[var(--background)] border-[var(--border)]'
+                        }`}
+                      >
+                        <div className="flex items-start gap-2">
+                          <span className="text-lg">{insight.icon}</span>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-xs">{insight.title}</p>
+                            <p className="text-[10px] text-[var(--foreground-muted)] mt-0.5 leading-relaxed">{insight.message}</p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center text-sm text-[var(--foreground-muted)] py-8">
+                    Complete a test to see insights
+                  </div>
+                )}
               </div>
             </section>
           )}
 
-          {/* AI-Powered Recommendations */}
-          {smartInsights.length > 0 && (
-            <section className="rounded-3xl border border-[var(--border)] bg-[var(--card)] p-6 shadow-xl">
-              <div className="space-y-1 mb-6">
-                <p className="text-xs uppercase tracking-wider text-[#fbbf24] font-semibold">Smart Insights</p>
-                <h3 className="text-sm text-[var(--foreground-muted)]">AI-powered recommendations</h3>
+          {/* ISP Baseline Section - Moved Up */}
+          <section className="rounded-3xl border border-[var(--border)] bg-[var(--card)] p-6 shadow-xl" id="baseline-section">
+            <div className="grid gap-6 md:grid-cols-[1fr,1.5fr]">
+              <div>
+                <p className="text-xs uppercase tracking-wider text-[#60a5fa] font-semibold">ISP Baseline</p>
+                <h2 className="mt-1 text-lg font-bold">Set your expectations</h2>
+                <p className="mt-2 text-xs text-[var(--foreground-muted)]">
+                  Enter your ISP plan speeds to compare against test results.
+                </p>
               </div>
-              
-              <div className="grid gap-3 sm:grid-cols-2">
-                {smartInsights.map((insight, index) => (
-                  <div 
-                    key={index}
-                    className={`rounded-xl p-4 border transition-all hover:scale-[1.01] ${
-                      insight.type === 'success' ? 'bg-[#34d399]/10 border-[#34d399]/30' :
-                      insight.type === 'warning' ? 'bg-[#fbbf24]/10 border-[#fbbf24]/30' :
-                      insight.type === 'tip' ? 'bg-[#60a5fa]/10 border-[#60a5fa]/30' :
-                      'bg-[var(--background)] border-[var(--border)]'
-                    }`}
-                  >
-                    <div className="flex items-start gap-3">
-                      <span className="text-xl">{insight.icon}</span>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-sm">{insight.title}</p>
-                        <p className="text-xs text-[var(--foreground-muted)] mt-1 leading-relaxed">{insight.message}</p>
-                      </div>
-                    </div>
-                  </div>
+              <div className="grid gap-3 grid-cols-3">
+                {[
+                  { label: "Download", unit: "Mbps", value: ispDown, onChange: (v: number) => setIspDown(clamp(v, 1, 2000)) },
+                  { label: "Upload", unit: "Mbps", value: ispUp, onChange: (v: number) => setIspUp(clamp(v, 1, 2000)) },
+                  { label: "Ping", unit: "ms", value: ispPing, onChange: (v: number) => setIspPing(clamp(v, 1, 200)) },
+                ].map((field) => (
+                  <label key={field.label} className="flex flex-col gap-1.5 text-xs">
+                    <span className="text-[var(--foreground-muted)] font-medium">{field.label} <span className="opacity-60">({field.unit})</span></span>
+                    <input
+                      type="number"
+                      inputMode="decimal"
+                      value={field.value}
+                      onChange={(e) => field.onChange(Number(e.target.value) || 0)}
+                      className="rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 outline-none focus:border-[#60a5fa] transition-colors text-sm font-medium"
+                    />
+                  </label>
                 ))}
               </div>
-            </section>
-          )}
+            </div>
+          </section>
 
           {/* Peak/Off-Peak Performance Analysis */}
           {peakAnalysis && (
@@ -2729,22 +2674,58 @@ export default function Home() {
                 </div>
               </div>
               
-              {/* Privacy Features */}
+              {/* Privacy Features - Functional Controls */}
               <div className="space-y-2">
                 <p className="text-xs text-[var(--foreground-muted)] font-medium">Your Privacy Controls:</p>
                 <div className="grid gap-2 sm:grid-cols-3">
-                  <div className="flex items-center gap-2 rounded-lg bg-[var(--background)] p-2 border border-[var(--border)]">
+                  <button 
+                    onClick={() => setIncognitoMode(!incognitoMode)}
+                    className={`flex items-center gap-2 rounded-lg p-2 border transition-all text-left ${
+                      incognitoMode 
+                        ? 'bg-[#a78bfa]/20 border-[#a78bfa]/50' 
+                        : 'bg-[var(--background)] border-[var(--border)] hover:border-[#a78bfa]/30'
+                    }`}
+                    aria-pressed={incognitoMode}
+                  >
                     <span className="text-sm">🕶️</span>
-                    <span className="text-xs">Incognito Mode</span>
-                  </div>
-                  <div className="flex items-center gap-2 rounded-lg bg-[var(--background)] p-2 border border-[var(--border)]">
+                    <div className="flex-1">
+                      <span className="text-xs font-medium">Incognito</span>
+                      <p className="text-[10px] text-[var(--foreground-muted)]">{incognitoMode ? 'Enabled' : 'Disabled'}</p>
+                    </div>
+                  </button>
+                  <button 
+                    onClick={() => {
+                      if (window.confirm('Clear all test history? This cannot be undone.')) {
+                        setHistory([]);
+                        localStorage.removeItem('speedtest_history');
+                      }
+                    }}
+                    className="flex items-center gap-2 rounded-lg bg-[var(--background)] p-2 border border-[var(--border)] hover:border-[#ff7b6b]/50 hover:bg-[#ff7b6b]/10 transition-all text-left"
+                    aria-label="Delete all history"
+                  >
                     <span className="text-sm">🗑️</span>
-                    <span className="text-xs">Delete History</span>
-                  </div>
-                  <div className="flex items-center gap-2 rounded-lg bg-[var(--background)] p-2 border border-[var(--border)]">
+                    <div className="flex-1">
+                      <span className="text-xs font-medium">Delete All</span>
+                      <p className="text-[10px] text-[var(--foreground-muted)]">{history.length} entries</p>
+                    </div>
+                  </button>
+                  <button 
+                    onClick={() => {
+                      setDataRetention(prev => ({ ...prev, autoDelete: !prev.autoDelete }));
+                    }}
+                    className={`flex items-center gap-2 rounded-lg p-2 border transition-all text-left ${
+                      dataRetention.autoDelete 
+                        ? 'bg-[#10b981]/20 border-[#10b981]/50' 
+                        : 'bg-[var(--background)] border-[var(--border)] hover:border-[#10b981]/30'
+                    }`}
+                    aria-pressed={dataRetention.autoDelete}
+                  >
                     <span className="text-sm">⏰</span>
-                    <span className="text-xs">Auto-Delete</span>
-                  </div>
+                    <div className="flex-1">
+                      <span className="text-xs font-medium">Auto-Delete</span>
+                      <p className="text-[10px] text-[var(--foreground-muted)]">{dataRetention.autoDelete ? `${dataRetention.deleteAfterDays}d` : 'Off'}</p>
+                    </div>
+                  </button>
                 </div>
               </div>
               
@@ -2768,131 +2749,54 @@ export default function Home() {
             </div>
           </section>
 
-          {/* Performance Benchmarks */}
+          {/* Performance Benchmarks - Compact Grid */}
           {latest && (
             <section className="rounded-3xl border border-[var(--border)] bg-[var(--card)] p-6 shadow-xl">
-              <div className="space-y-1 mb-6">
-                <p className="text-xs uppercase tracking-wider text-[#a78bfa] font-semibold">Performance Benchmarks</p>
-                <h3 className="text-sm text-[var(--foreground-muted)]">How your connection compares to industry standards</h3>
+              <div className="flex items-center justify-between mb-4">
+                <div className="space-y-1">
+                  <p className="text-xs uppercase tracking-wider text-[#a78bfa] font-semibold">Performance Benchmarks</p>
+                  <h3 className="text-sm text-[var(--foreground-muted)]">Industry standards comparison</h3>
+                </div>
+                <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                  latest.download >= 100 ? 'bg-[#34d399]/20 text-[#34d399]' :
+                  latest.download >= 25 ? 'bg-[#60a5fa]/20 text-[#60a5fa]' :
+                  latest.download >= 10 ? 'bg-[#fbbf24]/20 text-[#fbbf24]' : 'bg-[#ff7b6b]/20 text-[#ff7b6b]'
+                }`}>
+                  {latest.download >= 100 ? '🚀 Power User' :
+                   latest.download >= 50 ? '✨ All Supported' :
+                   latest.download >= 25 ? '👍 Most Supported' :
+                   latest.download >= 10 ? '⚠️ Basic Only' : '❌ Limited'}
+                </span>
               </div>
               
-              {/* Benchmark Categories */}
-              <div className="space-y-4">
+              {/* Compact Grid */}
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
                 {[
-                  { 
-                    name: 'HD Streaming (Netflix)', 
-                    required: 5, 
-                    recommended: 25,
-                    icon: '📺',
-                    description: 'Smooth 1080p video streaming'
-                  },
-                  { 
-                    name: '4K Streaming', 
-                    required: 25, 
-                    recommended: 50,
-                    icon: '🎬',
-                    description: 'Ultra HD content without buffering'
-                  },
-                  { 
-                    name: 'Online Gaming', 
-                    required: 10, 
-                    recommended: 25,
-                    icon: '🎮',
-                    description: 'Low latency multiplayer gaming'
-                  },
-                  { 
-                    name: 'Video Conferencing', 
-                    required: 3, 
-                    recommended: 15,
-                    icon: '💻',
-                    description: 'HD video calls (Zoom, Meet, Teams)'
-                  },
-                  { 
-                    name: 'Remote Work', 
-                    required: 10, 
-                    recommended: 50,
-                    icon: '🏠',
-                    description: 'Cloud apps, file sync, VPN'
-                  },
-                  { 
-                    name: 'Large File Downloads', 
-                    required: 25, 
-                    recommended: 100,
-                    icon: '📦',
-                    description: 'Software updates, games (50GB+)'
-                  }
-                ].map((benchmark) => {
-                  const currentSpeed = latest.download;
-                  const meetsRequired = currentSpeed >= benchmark.required;
-                  const meetsRecommended = currentSpeed >= benchmark.recommended;
-                  const percentage = Math.min(100, (currentSpeed / benchmark.recommended) * 100);
-                  
+                  { name: 'HD Stream', required: 5, icon: '📺' },
+                  { name: '4K Stream', required: 25, icon: '🎬' },
+                  { name: 'Gaming', required: 10, icon: '🎮' },
+                  { name: 'Video Calls', required: 3, icon: '💻' },
+                  { name: 'Remote Work', required: 10, icon: '🏠' },
+                  { name: 'Downloads', required: 25, icon: '📦' }
+                ].map((b) => {
+                  const ok = latest.download >= b.required;
                   return (
-                    <div key={benchmark.name} className="rounded-xl bg-[var(--background)] border border-[var(--border)] p-4">
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-2">
-                          <span className="text-lg">{benchmark.icon}</span>
-                          <div>
-                            <p className="font-medium text-sm">{benchmark.name}</p>
-                            <p className="text-[10px] text-[var(--foreground-muted)]">{benchmark.description}</p>
-                          </div>
-                        </div>
-                        <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
-                          meetsRecommended ? 'bg-[#34d399]/20 text-[#34d399]' :
-                          meetsRequired ? 'bg-[#fbbf24]/20 text-[#fbbf24]' :
-                          'bg-[#ff7b6b]/20 text-[#ff7b6b]'
-                        }`}>
-                          {meetsRecommended ? '✓ Excellent' : meetsRequired ? '~ Adequate' : '✗ Below'}
-                        </span>
-                      </div>
-                      
-                      {/* Progress bar */}
-                      <div className="relative h-2 rounded-full bg-[var(--card)] overflow-hidden">
-                        {/* Required threshold marker */}
-                        <div 
-                          className="absolute top-0 bottom-0 w-0.5 bg-[#fbbf24] z-10"
-                          style={{ left: `${(benchmark.required / benchmark.recommended) * 100}%` }}
-                        />
-                        {/* Progress fill */}
-                        <div 
-                          className={`absolute top-0 left-0 bottom-0 rounded-full transition-all ${
-                            meetsRecommended ? 'bg-[#34d399]' :
-                            meetsRequired ? 'bg-[#fbbf24]' :
-                            'bg-[#ff7b6b]'
-                          }`}
-                          style={{ width: `${Math.min(100, percentage)}%` }}
-                        />
-                      </div>
-                      
-                      <div className="flex justify-between mt-1.5">
-                        <span className="text-[10px] text-[var(--foreground-muted)]">
-                          Required: {benchmark.required} Mbps
-                        </span>
-                        <span className="text-[10px] text-[var(--foreground-muted)]">
-                          Recommended: {benchmark.recommended} Mbps
-                        </span>
-                      </div>
+                    <div key={b.name} className={`rounded-xl p-3 border text-center transition-all ${
+                      ok ? 'bg-[#34d399]/10 border-[#34d399]/30' : 'bg-[#ff7b6b]/10 border-[#ff7b6b]/30'
+                    }`}>
+                      <span className="text-lg">{b.icon}</span>
+                      <p className="text-xs font-medium mt-1">{b.name}</p>
+                      <p className={`text-[10px] font-semibold ${ok ? 'text-[#34d399]' : 'text-[#ff7b6b]'}`}>
+                        {ok ? '✓' : '✗'} {b.required} Mbps
+                      </p>
                     </div>
                   );
                 })}
               </div>
-              
-              {/* Summary */}
-              <div className="mt-4 pt-4 border-t border-[var(--border)]">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-[var(--foreground-muted)]">Overall Assessment</span>
-                  <span className={`text-sm font-bold ${
-                    latest.download >= 100 ? 'text-[#34d399]' :
-                    latest.download >= 25 ? 'text-[#60a5fa]' :
-                    latest.download >= 10 ? 'text-[#fbbf24]' : 'text-[#ff7b6b]'
-                  }`}>
-                    {latest.download >= 100 ? '🚀 Power User Ready' :
-                     latest.download >= 50 ? '✨ All Activities Supported' :
-                     latest.download >= 25 ? '👍 Most Activities Supported' :
-                     latest.download >= 10 ? '⚠️ Basic Activities Only' : '❌ Limited Capabilities'}
-                  </span>
-                </div>
+                  );
+                })}
               </div>
+              
             </section>
           )}
 
@@ -2966,68 +2870,6 @@ export default function Home() {
             )}
           </section>
 
-          {/* Baseline Section */}
-          <section className="rounded-3xl border border-[var(--border)] bg-[var(--card)] p-8 shadow-xl" id="baseline-section">
-            <div className="grid gap-8 md:grid-cols-[1fr,1.2fr]">
-              <div>
-                <p className="text-xs uppercase tracking-wider text-[#f4b8c5] font-semibold">ISP Baseline</p>
-                <h2 className="mt-2 text-2xl font-bold">Set your expectations</h2>
-                <p className="mt-3 text-sm text-[var(--foreground-muted)]">
-                  Enter your ISP plan speeds to compare against your actual test results.
-                </p>
-              </div>
-              <div className="grid gap-3 sm:grid-cols-3">
-                {[
-                  { label: "Download (Mbps)", value: ispDown, onChange: (v: number) => setIspDown(clamp(v, 1, 2000)) },
-                  { label: "Upload (Mbps)", value: ispUp, onChange: (v: number) => setIspUp(clamp(v, 1, 2000)) },
-                  { label: "Ping (ms)", value: ispPing, onChange: (v: number) => setIspPing(clamp(v, 1, 200)) },
-                ].map((field) => (
-                  <label key={field.label} className="flex flex-col gap-2 text-xs">
-                    <span className="text-[var(--foreground-muted)] font-medium">{field.label}</span>
-                    <input
-                      type="number"
-                      inputMode="decimal"
-                      value={field.value}
-                      onChange={(e) => field.onChange(Number(e.target.value) || 0)}
-                      className="rounded-xl border border-[var(--border)] bg-[var(--background)] px-4 py-3 outline-none focus:border-[#ff7b6b] transition-colors text-sm font-medium"
-                    />
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            {/* Comparison display */}
-            {baselineCompare && (
-              <div className="mt-8 border-t border-[var(--border)] pt-8">
-                <p className="text-xs uppercase tracking-wider text-[var(--foreground-muted)] font-semibold mb-4">Last test comparison</p>
-                <div className="grid gap-3 sm:grid-cols-3">
-                  {[
-                    { label: "Download", delta: baselineCompare.downDelta, unit: " Mbps", betterHigher: true },
-                    { label: "Upload", delta: baselineCompare.upDelta, unit: " Mbps", betterHigher: true },
-                    { label: "Ping", delta: baselineCompare.pingDelta, unit: " ms", betterHigher: false },
-                  ].map((item) => {
-                    const isPositive = item.delta >= 0;
-                    const good = item.betterHigher ? isPositive : !isPositive;
-                    const sign = item.delta > 0 ? "+" : "";
-                    return (
-                      <div key={item.label} className="flex flex-col gap-2 rounded-2xl border border-[var(--border)] bg-[var(--background)] px-4 py-4 card-hover">
-                        <p className="text-xs uppercase tracking-wider text-[var(--foreground-muted)] font-medium">{item.label}</p>
-                        <p className={`text-xl font-bold ${good ? "text-[#34d399]" : "text-[#ff7b6b]"}`}>
-                          {sign}{item.delta.toFixed(1)}{item.unit}
-                        </p>
-                        <p className="text-xs text-[var(--foreground-muted)]">
-                          {item.label === "Ping" 
-                            ? (good ? "✓ Lower than baseline" : "⚠ Higher than baseline")
-                            : (good ? "✓ On target" : "⚠ Below baseline")
-                          }
-                        </p>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-          </section>
         </main>
 
         {/* Results Modal */}
