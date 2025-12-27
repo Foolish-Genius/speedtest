@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { SpeedLabLogo } from "@/components/Logo";
 
 type SpeedResult = {
@@ -16,7 +16,7 @@ type SpeedResult = {
     jitter: number;
     stabilityScore: number;
     grade: string;
-    trendSlope: number; // positive = improving, negative = degrading
+    trendSlope: number;
   };
 };
 
@@ -30,12 +30,16 @@ type DetailedStats = {
   p99: number;
 };
 
-const palette = {
-  charcoal: "#2C2B30",
-  graphite: "#4F4F51",
-  silver: "#D6D6D6",
-  rose: "#F2C4CE",
-  coral: "#F58F7C",
+// Updated color palette
+const colors = {
+  coral: "#ff7b6b",
+  coralLight: "#ff9d91",
+  rose: "#f4b8c5",
+  roseLight: "#fad4dd",
+  emerald: "#34d399",
+  emeraldLight: "#6ee7b7",
+  blue: "#60a5fa",
+  amber: "#fbbf24",
 };
 
 const formatMbps = (value: number) => `${value.toFixed(1)} Mbps`;
@@ -179,11 +183,318 @@ const CircularGauge = ({ value, max, label, unit, color, size = 140 }: { value: 
         </svg>
         {/* Center text */}
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-2xl font-bold text-white">{value.toFixed(value >= 100 ? 0 : 1)}</span>
+          <span className="text-2xl font-bold text-white dark:text-white">{value.toFixed(value >= 100 ? 0 : 1)}</span>
           <span className="text-xs text-white/60">{unit}</span>
         </div>
       </div>
       <span className="text-sm font-medium text-white/80">{label}</span>
+    </div>
+  );
+};
+
+// Large Speedometer Component - The centerpiece
+const Speedometer = ({ 
+  value, 
+  max, 
+  phase, 
+  isRunning 
+}: { 
+  value: number; 
+  max: number; 
+  phase: "ping" | "download" | "upload" | null;
+  isRunning: boolean;
+}) => {
+  const size = 280;
+  const strokeWidth = 24;
+  const radius = (size - strokeWidth) / 2;
+  const circumference = Math.PI * radius; // Half circle
+  const percentage = Math.min((value / max) * 100, 100);
+  const offset = circumference - (percentage / 100) * circumference;
+  
+  const getColor = () => {
+    if (phase === "ping") return colors.emerald;
+    if (phase === "download") return colors.coral;
+    if (phase === "upload") return colors.rose;
+    return colors.coral;
+  };
+
+  const getLabel = () => {
+    if (phase === "ping") return "PING";
+    if (phase === "download") return "DOWNLOAD";
+    if (phase === "upload") return "UPLOAD";
+    return "READY";
+  };
+
+  const getUnit = () => {
+    if (phase === "ping") return "ms";
+    return "Mbps";
+  };
+  
+  const color = getColor();
+  
+  // Generate tick marks
+  const ticks = [];
+  const tickCount = 10;
+  for (let i = 0; i <= tickCount; i++) {
+    const angle = 180 + (i / tickCount) * 180;
+    const rad = (angle * Math.PI) / 180;
+    const innerR = radius - 35;
+    const outerR = radius - 25;
+    const x1 = size / 2 + innerR * Math.cos(rad);
+    const y1 = size / 2 + innerR * Math.sin(rad);
+    const x2 = size / 2 + outerR * Math.cos(rad);
+    const y2 = size / 2 + outerR * Math.sin(rad);
+    ticks.push({ x1, y1, x2, y2, label: Math.round((i / tickCount) * max) });
+  }
+
+  return (
+    <div className="relative flex flex-col items-center">
+      <div className="relative" style={{ width: size, height: size / 2 + 60 }}>
+        <svg width={size} height={size / 2 + 40} className="overflow-visible">
+          <defs>
+            <linearGradient id="speedGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor={colors.emerald} />
+              <stop offset="50%" stopColor={colors.coral} />
+              <stop offset="100%" stopColor="#ef4444" />
+            </linearGradient>
+            <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+              <feGaussianBlur stdDeviation="4" result="coloredBlur"/>
+              <feMerge>
+                <feMergeNode in="coloredBlur"/>
+                <feMergeNode in="SourceGraphic"/>
+              </feMerge>
+            </filter>
+            <filter id="glowStrong" x="-50%" y="-50%" width="200%" height="200%">
+              <feGaussianBlur stdDeviation="8" result="coloredBlur"/>
+              <feMerge>
+                <feMergeNode in="coloredBlur"/>
+                <feMergeNode in="SourceGraphic"/>
+              </feMerge>
+            </filter>
+          </defs>
+          
+          {/* Outer decorative ring */}
+          <circle
+            cx={size / 2}
+            cy={size / 2}
+            r={radius + 8}
+            fill="none"
+            stroke="rgba(255,255,255,0.03)"
+            strokeWidth="1"
+          />
+          
+          {/* Background arc */}
+          <path
+            d={`M ${strokeWidth / 2} ${size / 2} A ${radius} ${radius} 0 0 1 ${size - strokeWidth / 2} ${size / 2}`}
+            fill="none"
+            stroke="rgba(255,255,255,0.06)"
+            strokeWidth={strokeWidth}
+            strokeLinecap="round"
+          />
+          
+          {/* Gradient background arc */}
+          <path
+            d={`M ${strokeWidth / 2} ${size / 2} A ${radius} ${radius} 0 0 1 ${size - strokeWidth / 2} ${size / 2}`}
+            fill="none"
+            stroke="url(#speedGradient)"
+            strokeWidth={strokeWidth}
+            strokeLinecap="round"
+            opacity="0.15"
+          />
+          
+          {/* Progress arc */}
+          <path
+            d={`M ${strokeWidth / 2} ${size / 2} A ${radius} ${radius} 0 0 1 ${size - strokeWidth / 2} ${size / 2}`}
+            fill="none"
+            stroke={color}
+            strokeWidth={strokeWidth}
+            strokeLinecap="round"
+            strokeDasharray={circumference}
+            strokeDashoffset={offset}
+            className="transition-all duration-300 ease-out"
+            filter={isRunning ? "url(#glowStrong)" : "url(#glow)"}
+          />
+          
+          {/* Tick marks */}
+          {ticks.map((tick, i) => (
+            <g key={i}>
+              <line
+                x1={tick.x1}
+                y1={tick.y1}
+                x2={tick.x2}
+                y2={tick.y2}
+                stroke="rgba(255,255,255,0.2)"
+                strokeWidth={i % 2 === 0 ? 2 : 1}
+              />
+            </g>
+          ))}
+          
+          {/* Center decoration */}
+          <circle
+            cx={size / 2}
+            cy={size / 2}
+            r={60}
+            fill="rgba(0,0,0,0.3)"
+            stroke="rgba(255,255,255,0.1)"
+            strokeWidth="1"
+          />
+          <circle
+            cx={size / 2}
+            cy={size / 2}
+            r={50}
+            fill="rgba(0,0,0,0.5)"
+          />
+        </svg>
+        
+        {/* Center content */}
+        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center pt-4">
+          <span 
+            className="text-6xl font-bold tracking-tight transition-colors duration-300"
+            style={{ color }}
+          >
+            {phase === "ping" ? value.toFixed(0) : value.toFixed(1)}
+          </span>
+          <span className="text-lg text-[var(--foreground-muted)] font-medium">{getUnit()}</span>
+        </div>
+        
+        {/* Phase label */}
+        <div className="absolute -bottom-2 left-1/2 -translate-x-1/2">
+          <span 
+            className={`text-sm font-bold tracking-widest uppercase transition-all duration-300 ${isRunning ? 'animate-pulse' : ''}`}
+            style={{ color }}
+          >
+            {getLabel()}
+          </span>
+        </div>
+      </div>
+      
+      {/* Speed scale labels */}
+      <div className="flex justify-between w-full px-4 mt-2 text-xs text-[var(--foreground-muted)]">
+        <span>0</span>
+        <span>{max / 2}</span>
+        <span>{max}</span>
+      </div>
+    </div>
+  );
+};
+
+// Theme Toggle Button
+const ThemeToggle = ({ theme, setTheme }: { theme: string; setTheme: (t: string) => void }) => {
+  return (
+    <button
+      onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+      className="relative p-2 rounded-xl bg-[var(--card)] border border-[var(--border)] hover:border-[var(--border-hover)] transition-all duration-200 hover:scale-105 active:scale-95"
+      title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+    >
+      {theme === 'dark' ? (
+        <svg className="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+        </svg>
+      ) : (
+        <svg className="w-5 h-5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+        </svg>
+      )}
+    </button>
+  );
+};
+
+// Results Modal Component
+const ResultsModal = ({ 
+  isOpen, 
+  onClose, 
+  result,
+  onRunAgain 
+}: { 
+  isOpen: boolean; 
+  onClose: () => void; 
+  result: SpeedResult | null;
+  onRunAgain: () => void;
+}) => {
+  if (!isOpen || !result) return null;
+
+  const grade = result.stats?.grade || 'N/A';
+  const badge = getConditionBadge(grade);
+
+  return (
+    <div 
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200"
+      onClick={onClose}
+    >
+      <div 
+        className="relative w-full max-w-lg bg-[var(--card)] rounded-3xl border border-[var(--border)] shadow-2xl p-8 animate-in zoom-in-95 duration-300"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Close button */}
+        <button 
+          onClick={onClose}
+          className="absolute top-4 right-4 p-2 rounded-full hover:bg-[var(--card-hover)] transition-colors"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+
+        {/* Grade display */}
+        <div className="text-center mb-8">
+          <div className="inline-flex items-center justify-center w-24 h-24 rounded-full mb-4" style={{ backgroundColor: `${badge.color}20` }}>
+            <span className="text-5xl font-bold" style={{ color: badge.color }}>{grade}</span>
+          </div>
+          <h2 className="text-2xl font-bold text-[var(--foreground)]">Test Complete!</h2>
+          <span 
+            className="inline-block mt-2 px-4 py-1 rounded-full text-sm font-semibold"
+            style={{ backgroundColor: `${badge.color}20`, color: badge.color }}
+          >
+            {badge.label}
+          </span>
+        </div>
+
+        {/* Results grid */}
+        <div className="grid grid-cols-3 gap-4 mb-8">
+          <div className="text-center p-4 rounded-2xl bg-[var(--background)]">
+            <div className="text-3xl font-bold text-[#ff7b6b]">{result.download.toFixed(1)}</div>
+            <div className="text-xs text-[var(--foreground-muted)] mt-1">↓ Download Mbps</div>
+          </div>
+          <div className="text-center p-4 rounded-2xl bg-[var(--background)]">
+            <div className="text-3xl font-bold text-[#f4b8c5]">{result.upload.toFixed(1)}</div>
+            <div className="text-xs text-[var(--foreground-muted)] mt-1">↑ Upload Mbps</div>
+          </div>
+          <div className="text-center p-4 rounded-2xl bg-[var(--background)]">
+            <div className="text-3xl font-bold text-[#34d399]">{result.ping}</div>
+            <div className="text-xs text-[var(--foreground-muted)] mt-1">⏱ Ping ms</div>
+          </div>
+        </div>
+
+        {/* Extra stats */}
+        {result.stats && (
+          <div className="grid grid-cols-2 gap-3 mb-8 text-sm">
+            <div className="flex justify-between p-3 rounded-xl bg-[var(--background)]">
+              <span className="text-[var(--foreground-muted)]">Jitter</span>
+              <span className="font-semibold">{result.stats.jitter.toFixed(1)} ms</span>
+            </div>
+            <div className="flex justify-between p-3 rounded-xl bg-[var(--background)]">
+              <span className="text-[var(--foreground-muted)]">Stability</span>
+              <span className="font-semibold">{result.stats.stabilityScore}%</span>
+            </div>
+          </div>
+        )}
+
+        {/* Actions */}
+        <div className="flex gap-3">
+          <button
+            onClick={onClose}
+            className="flex-1 py-3 px-6 rounded-xl border border-[var(--border)] hover:bg-[var(--card-hover)] transition-all font-medium"
+          >
+            View Details
+          </button>
+          <button
+            onClick={() => { onClose(); onRunAgain(); }}
+            className="flex-1 py-3 px-6 rounded-xl bg-gradient-to-r from-[#ff7b6b] to-[#f4b8c5] text-white font-semibold hover:opacity-90 transition-all hover:scale-[1.02] active:scale-[0.98]"
+          >
+            Run Again
+          </button>
+        </div>
+      </div>
     </div>
   );
 };
@@ -220,6 +531,20 @@ export default function Home() {
   const [realtimePing, setRealtimePing] = useState<number[]>([]);
   const [realtimeDown, setRealtimeDown] = useState<number[]>([]);
   const [realtimeUp, setRealtimeUp] = useState<number[]>([]);
+  const [theme, setTheme] = useState<string>("dark");
+  const [showResultsModal, setShowResultsModal] = useState(false);
+
+  // Theme effect
+  useEffect(() => {
+    const savedTheme = window.localStorage.getItem("speedlabs-theme") || "dark";
+    setTheme(savedTheme);
+    document.documentElement.setAttribute("data-theme", savedTheme);
+  }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem("speedlabs-theme", theme);
+    document.documentElement.setAttribute("data-theme", theme);
+  }, [theme]);
 
   useEffect(() => {
     const stored = window.localStorage.getItem("speedtest-history");
@@ -457,6 +782,9 @@ export default function Home() {
             setStatus("done");
             setPhase(null);
             setHistory((prevHistory) => [result, ...prevHistory].slice(0, 8));
+            
+            // Show results modal after a brief delay
+            setTimeout(() => setShowResultsModal(true), 300);
 
             return allSamples;
           });
@@ -526,7 +854,7 @@ export default function Home() {
     const url = URL.createObjectURL(dataBlob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `speedlab-history-${new Date().toISOString().split('T')[0]}.json`;
+    link.download = `speedlabs-history-${new Date().toISOString().split('T')[0]}.json`;
     link.click();
     URL.revokeObjectURL(url);
   };
@@ -549,7 +877,7 @@ export default function Home() {
     const url = URL.createObjectURL(dataBlob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `speedlab-history-${new Date().toISOString().split('T')[0]}.csv`;
+    link.download = `speedlabs-history-${new Date().toISOString().split('T')[0]}.csv`;
     link.click();
     URL.revokeObjectURL(url);
   };
@@ -563,28 +891,37 @@ export default function Home() {
   }, [history]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#2C2B30] via-[#4F4F51] to-[#2C2B30] text-[#D6D6D6]">
+    <div className="min-h-screen bg-[var(--background)] text-[var(--foreground)] transition-colors duration-300">
+      {/* Results Modal */}
+      <ResultsModal 
+        isOpen={showResultsModal} 
+        onClose={() => setShowResultsModal(false)} 
+        result={latest}
+        onRunAgain={startTest}
+      />
+      
       <div className="relative overflow-hidden">
         {/* Gradient orbs */}
-        <div className="pointer-events-none absolute inset-0 opacity-40" aria-hidden>
-          <div className="absolute -left-32 top-5 h-72 w-72 rounded-full bg-[#F2C4CE] blur-[140px]" />
-          <div className="absolute -right-20 top-48 h-96 w-96 rounded-full bg-[#F58F7C] blur-[160px]" />
+        <div className="pointer-events-none absolute inset-0 opacity-30" aria-hidden>
+          <div className="absolute -left-32 top-5 h-72 w-72 rounded-full bg-[#f4b8c5] blur-[140px]" />
+          <div className="absolute -right-20 top-48 h-96 w-96 rounded-full bg-[#ff7b6b] blur-[160px]" />
+          <div className="absolute left-1/2 top-96 h-64 w-64 rounded-full bg-[#34d399] blur-[120px] opacity-30" />
         </div>
 
         {/* Navbar */}
-        <nav className="relative border-b border-white/10 bg-black/20 backdrop-blur-md">
+        <nav className="relative border-b border-[var(--border)] bg-[var(--card)]/80 backdrop-blur-xl sticky top-0 z-40">
           <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4 sm:px-10 md:px-14">
             <div className="flex items-center gap-3">
               <SpeedLabLogo />
-              <span className="text-lg font-bold text-white">Speed Lab</span>
+              <span className="text-lg font-bold">Speed Labs</span>
             </div>
-            <div className="hidden gap-8 md:flex">
+            <div className="hidden items-center gap-8 md:flex">
               <button 
                 onClick={() => {
                   const testSection = document.getElementById("test-section");
                   testSection?.scrollIntoView({ behavior: "smooth" });
                 }}
-                className="text-sm text-[#D6D6D6] hover:text-[#F58F7C] transition-colors font-medium"
+                className="text-sm text-[var(--foreground-muted)] hover:text-[#ff7b6b] transition-colors font-medium"
               >
                 Test
               </button>
@@ -593,7 +930,7 @@ export default function Home() {
                   const historySection = document.getElementById("history-section");
                   historySection?.scrollIntoView({ behavior: "smooth" });
                 }}
-                className="text-sm text-[#D6D6D6] hover:text-[#F58F7C] transition-colors font-medium"
+                className="text-sm text-[var(--foreground-muted)] hover:text-[#ff7b6b] transition-colors font-medium"
               >
                 History
               </button>
@@ -602,24 +939,28 @@ export default function Home() {
                   const baselineSection = document.getElementById("baseline-section");
                   baselineSection?.scrollIntoView({ behavior: "smooth" });
                 }}
-                className="text-sm text-[#D6D6D6] hover:text-[#F58F7C] transition-colors font-medium"
+                className="text-sm text-[var(--foreground-muted)] hover:text-[#ff7b6b] transition-colors font-medium"
               >
                 Baseline
               </button>
+              <ThemeToggle theme={theme} setTheme={setTheme} />
             </div>
-            <button
-              className="relative md:hidden"
-              onClick={() => setMenuOpen(!menuOpen)}
-            >
-              <div className="h-6 w-6 flex flex-col justify-center gap-1.5">
-                <span className={`h-0.5 w-full bg-white transition-all ${menuOpen ? "translate-y-2 rotate-45" : ""}`} />
-                <span className={`h-0.5 w-full bg-white transition-all ${menuOpen ? "opacity-0" : ""}`} />
-                <span className={`h-0.5 w-full bg-white transition-all ${menuOpen ? "-translate-y-2 -rotate-45" : ""}`} />
-              </div>
-            </button>
+            <div className="flex items-center gap-3 md:hidden">
+              <ThemeToggle theme={theme} setTheme={setTheme} />
+              <button
+                className="relative"
+                onClick={() => setMenuOpen(!menuOpen)}
+              >
+                <div className="h-6 w-6 flex flex-col justify-center gap-1.5">
+                  <span className={`h-0.5 w-full bg-[var(--foreground)] transition-all ${menuOpen ? "translate-y-2 rotate-45" : ""}`} />
+                  <span className={`h-0.5 w-full bg-[var(--foreground)] transition-all ${menuOpen ? "opacity-0" : ""}`} />
+                  <span className={`h-0.5 w-full bg-[var(--foreground)] transition-all ${menuOpen ? "-translate-y-2 -rotate-45" : ""}`} />
+                </div>
+              </button>
+            </div>
           </div>
           {menuOpen && (
-            <div className="border-t border-white/10 bg-black/40 px-6 py-4 md:hidden">
+            <div className="border-t border-[var(--border)] bg-[var(--card)] px-6 py-4 md:hidden">
               <div className="flex flex-col gap-3">
                 <button 
                   onClick={() => {
@@ -627,7 +968,7 @@ export default function Home() {
                     testSection?.scrollIntoView({ behavior: "smooth" });
                     setMenuOpen(false);
                   }}
-                  className="text-sm text-[#D6D6D6] hover:text-[#F58F7C] transition-colors text-left font-medium"
+                  className="text-sm text-[var(--foreground-muted)] hover:text-[#ff7b6b] transition-colors text-left font-medium"
                 >
                   Test
                 </button>
@@ -637,7 +978,7 @@ export default function Home() {
                     historySection?.scrollIntoView({ behavior: "smooth" });
                     setMenuOpen(false);
                   }}
-                  className="text-sm text-[#D6D6D6] hover:text-[#F58F7C] transition-colors text-left font-medium"
+                  className="text-sm text-[var(--foreground-muted)] hover:text-[#ff7b6b] transition-colors text-left font-medium"
                 >
                   History
                 </button>
@@ -647,7 +988,7 @@ export default function Home() {
                     baselineSection?.scrollIntoView({ behavior: "smooth" });
                     setMenuOpen(false);
                   }}
-                  className="text-sm text-[#D6D6D6] hover:text-[#F58F7C] transition-colors text-left font-medium"
+                  className="text-sm text-[var(--foreground-muted)] hover:text-[#ff7b6b] transition-colors text-left font-medium"
                 >
                   Baseline
                 </button>
@@ -656,525 +997,339 @@ export default function Home() {
           )}
         </nav>
 
-        <main className="relative mx-auto flex max-w-6xl flex-col gap-12 px-6 pb-20 pt-12 sm:px-10 md:px-14">
-          {/* Hero section */}
-          <header className="flex flex-col gap-8 sm:flex-row sm:items-start sm:justify-between">
-            <div className="flex flex-col gap-4 flex-1">
-              <div className="inline-flex w-fit">
-                <span className="rounded-full bg-gradient-to-r from-[#F58F7C] to-[#F2C4CE] bg-clip-text text-xs font-bold uppercase tracking-widest text-transparent">
-                  Connection Intelligence
-                </span>
+        <main className="relative mx-auto flex max-w-6xl flex-col gap-6 px-6 pb-20 pt-2 sm:px-10 md:px-14">
+          {/* Hero section - Speedometer left, Stats right */}
+          <header className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start" id="test-section">
+            {/* Left side - Speedometer + Graph */}
+            <div className="flex flex-col items-center gap-2">
+              <Speedometer 
+                value={phase === "ping" ? ping : phase === "download" ? download : phase === "upload" ? upload : download}
+                max={phase === "ping" ? 50 : ispDown * 1.2}
+                phase={phase}
+                isRunning={running}
+              />
+              
+              {/* Phase indicator under speedometer */}
+              {running && (
+                <div className="flex items-center gap-4">
+                  <div className={`flex items-center gap-2 ${phase === "ping" ? "text-[#34d399]" : "text-[var(--foreground-muted)]"}`}>
+                    <div className={`w-2 h-2 rounded-full ${phase === "ping" ? "bg-[#34d399] animate-pulse" : "bg-[var(--foreground-muted)]/30"}`} />
+                    <span className="text-sm font-medium">Ping</span>
+                  </div>
+                  <div className={`flex items-center gap-2 ${phase === "download" ? "text-[#ff7b6b]" : "text-[var(--foreground-muted)]"}`}>
+                    <div className={`w-2 h-2 rounded-full ${phase === "download" ? "bg-[#ff7b6b] animate-pulse" : "bg-[var(--foreground-muted)]/30"}`} />
+                    <span className="text-sm font-medium">Download</span>
+                  </div>
+                  <div className={`flex items-center gap-2 ${phase === "upload" ? "text-[#f4b8c5]" : "text-[var(--foreground-muted)]"}`}>
+                    <div className={`w-2 h-2 rounded-full ${phase === "upload" ? "bg-[#f4b8c5] animate-pulse" : "bg-[var(--foreground-muted)]/30"}`} />
+                    <span className="text-sm font-medium">Upload</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Real-time Graph - Below Speedometer - Shows all 3 metrics */}
+              <div className="w-full mt-2 rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-1.5">
+                      <span className="h-2 w-2 rounded-full bg-[#34d399]" />
+                      <span className="text-xs text-[var(--foreground-muted)]">Ping</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="h-2 w-2 rounded-full bg-[#ff7b6b]" />
+                      <span className="text-xs text-[var(--foreground-muted)]">Down</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="h-2 w-2 rounded-full bg-[#f4b8c5]" />
+                      <span className="text-xs text-[var(--foreground-muted)]">Up</span>
+                    </div>
+                  </div>
+                  {running && (
+                    <div className="flex items-center gap-2">
+                      <div className="w-16 h-1.5 rounded-full bg-[var(--background-secondary)] overflow-hidden">
+                        <div className="h-full rounded-full bg-gradient-to-r from-[#ff7b6b] to-[#f4b8c5] transition-all" style={{ width: `${progress}%` }} />
+                      </div>
+                      <p className="text-xs font-bold text-[#ff7b6b]">{Math.round(progress)}%</p>
+                    </div>
+                  )}
+                </div>
+                <svg viewBox="0 0 400 60" className="w-full h-14" preserveAspectRatio="none">
+                  <line x1="0" x2="400" y1="15" y2="15" stroke="var(--border)" strokeWidth="1" opacity="0.2" />
+                  <line x1="0" x2="400" y1="30" y2="30" stroke="var(--border)" strokeWidth="1" opacity="0.3" />
+                  <line x1="0" x2="400" y1="45" y2="45" stroke="var(--border)" strokeWidth="1" opacity="0.2" />
+                  {/* Always show ping if data exists */}
+                  {realtimePing.length > 0 && (
+                    <path d={buildSparkPath(realtimePing, 400, 60)} fill="none" stroke="#34d399" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" opacity={phase === "ping" || status === "done" ? 1 : 0.4} />
+                  )}
+                  {/* Always show download if data exists */}
+                  {realtimeDown.length > 0 && (
+                    <path d={buildSparkPath(realtimeDown, 400, 60)} fill="none" stroke="#ff7b6b" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" opacity={phase === "download" || status === "done" ? 1 : 0.4} />
+                  )}
+                  {/* Always show upload if data exists */}
+                  {realtimeUp.length > 0 && (
+                    <path d={buildSparkPath(realtimeUp, 400, 60)} fill="none" stroke="#f4b8c5" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" opacity={phase === "upload" || status === "done" ? 1 : 0.4} />
+                  )}
+                </svg>
+                {status === "idle" && realtimePing.length === 0 && (
+                  <p className="text-xs text-[var(--foreground-muted)] text-center mt-2">Run a test to see real-time data</p>
+                )}
               </div>
-              <h1 className="text-5xl font-bold leading-tight text-white sm:text-6xl">
-                Know your network inside and out.
-              </h1>
-              <p className="max-w-lg text-base text-[#D6D6D6]/85">
-                Real-time speed testing, performance tracking, and ISP baseline comparison. All locally stored, always private.
-              </p>
             </div>
 
-            {/* Live metrics card with gauges */}
-            <div className="w-full rounded-3xl border border-white/15 bg-gradient-to-br from-white/8 to-white/5 p-6 shadow-2xl backdrop-blur-xl sm:w-80 sm:flex-shrink-0">
-              <div className="space-y-1 text-center sm:text-left">
-                <p className="text-xs uppercase tracking-wider text-[#F2C4CE] font-semibold">Live metrics</p>
-                <h3 className="text-sm text-[#D6D6D6]/80">Current test status</h3>
+            {/* Right side - Text, Stats, and Button */}
+            <div className="flex flex-col gap-3">
+              <div>
+                <span className="inline-block rounded-full bg-gradient-to-r from-[#ff7b6b] to-[#f4b8c5] bg-clip-text text-xs font-bold uppercase tracking-widest text-transparent mb-1">
+                  Connection Intelligence
+                </span>
+                <h1 className="text-xl font-bold leading-tight sm:text-2xl">
+                  Test your speed instantly
+                </h1>
+              </div>
+
+              {/* Stacked Stats - Download, Upload, Ping */}
+              <div className="flex flex-col gap-1.5">
+                <div className="flex items-center p-2.5 rounded-lg bg-[var(--card)] border border-[var(--border)]">
+                  <div className="flex items-center gap-2.5 flex-1">
+                    <div className="w-8 h-8 rounded-md bg-[#ff7b6b]/20 flex items-center justify-center">
+                      <span className="text-[#ff7b6b] text-sm">↓</span>
+                    </div>
+                    <div className="flex items-baseline gap-1">
+                      <p className="text-lg font-bold text-[#ff7b6b]">{download.toFixed(1)}</p>
+                      <p className="text-xs text-[var(--foreground-muted)]">Mbps</p>
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-[var(--foreground-muted)] uppercase">Download</p>
+                </div>
+                <div className="flex items-center p-2.5 rounded-lg bg-[var(--card)] border border-[var(--border)]">
+                  <div className="flex items-center gap-2.5 flex-1">
+                    <div className="w-8 h-8 rounded-md bg-[#f4b8c5]/20 flex items-center justify-center">
+                      <span className="text-[#f4b8c5] text-sm">↑</span>
+                    </div>
+                    <div className="flex items-baseline gap-1">
+                      <p className="text-lg font-bold text-[#f4b8c5]">{upload.toFixed(1)}</p>
+                      <p className="text-xs text-[var(--foreground-muted)]">Mbps</p>
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-[var(--foreground-muted)] uppercase">Upload</p>
+                </div>
+                <div className="flex items-center p-2.5 rounded-lg bg-[var(--card)] border border-[var(--border)]">
+                  <div className="flex items-center gap-2.5 flex-1">
+                    <div className="w-8 h-8 rounded-md bg-[#34d399]/20 flex items-center justify-center">
+                      <span className="text-[#34d399] text-sm">⏱</span>
+                    </div>
+                    <div className="flex items-baseline gap-1">
+                      <p className="text-lg font-bold text-[#34d399]">{ping.toFixed(0)}</p>
+                      <p className="text-xs text-[var(--foreground-muted)]">ms</p>
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-[var(--foreground-muted)] uppercase">Ping</p>
+                </div>
+              </div>
+
+              {/* Start Button */}
+              <button
+                onClick={startTest}
+                disabled={running}
+                className="group relative overflow-hidden rounded-full bg-gradient-to-r from-[#ff7b6b] to-[#f4b8c5] px-6 py-3 font-semibold text-white shadow-2xl transition-all duration-300 hover:scale-[1.02] hover:shadow-[0_20px_40px_rgba(255,123,107,0.3)] disabled:cursor-not-allowed disabled:opacity-60 disabled:scale-100 text-sm ripple w-full"
+              >
+                <span className="relative z-10 flex items-center justify-center gap-3">
+                  {running ? (
+                    <>
+                      <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                      </svg>
+                      Testing...
+                    </>
+                  ) : status === "done" ? (
+                    "Test Again"
+                  ) : (
+                    <>
+                      <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
+                      </svg>
+                      Start Test
+                    </>
+                  )}
+                </span>
+              </button>
+            </div>
+          </header>
+
+          {/* Stats Section */}
+          <section className="grid gap-8 lg:grid-cols-2">
+            {/* Live metrics card */}
+            <div className="rounded-3xl border border-[var(--border)] bg-[var(--card)] p-6 shadow-xl card-hover">
+              <div className="space-y-1">
+                <p className="text-xs uppercase tracking-wider text-[#f4b8c5] font-semibold">Live metrics</p>
+                <h3 className="text-sm text-[var(--foreground-muted)]">Current test status</h3>
               </div>
               
               {status === "running" && (
                 <div className="mt-6 grid grid-cols-3 gap-4">
                   <CircularGauge value={ping} max={50} label="Ping" unit="ms" color="#34d399" size={90} />
-                  <CircularGauge value={download} max={ispDown * 1.2} label="Down" unit="Mbps" color="#F58F7C" size={90} />
-                  <CircularGauge value={upload} max={ispUp * 1.2} label="Up" unit="Mbps" color="#F2C4CE" size={90} />
+                  <CircularGauge value={download} max={ispDown * 1.2} label="Down" unit="Mbps" color="#ff7b6b" size={90} />
+                  <CircularGauge value={upload} max={ispUp * 1.2} label="Up" unit="Mbps" color="#f4b8c5" size={90} />
                 </div>
               )}
               
               {status !== "running" && latest?.stats && (
                 <div className="mt-6 space-y-4">
                   <div className="flex items-center justify-center gap-4">
-                    <div className="flex flex-col items-center gap-2 rounded-2xl bg-gradient-to-br from-white/10 to-white/5 px-6 py-4 border border-white/10">
-                      <span className="text-4xl font-bold text-white">{latest.stats.grade}</span>
-                      <span className="text-xs text-white/60 uppercase tracking-wider">Overall Grade</span>
+                    <div className="flex flex-col items-center gap-2 rounded-2xl bg-[var(--background)] px-6 py-4 border border-[var(--border)]">
+                      <span className="text-4xl font-bold">{latest.stats.grade}</span>
+                      <span className="text-xs text-[var(--foreground-muted)] uppercase tracking-wider">Overall Grade</span>
                     </div>
                     <div className="flex flex-col gap-2">
                       <div className="rounded-full px-3 py-1 text-xs font-semibold" style={{ backgroundColor: `${getConditionBadge(latest.stats.grade).color}20`, color: getConditionBadge(latest.stats.grade).color }}>
                         {getConditionBadge(latest.stats.grade).label}
                       </div>
-                      <div className="text-xs text-white/60">
+                      <div className="text-xs text-[var(--foreground-muted)]">
                         Stability: {latest.stats.stabilityScore}%
                       </div>
                     </div>
                   </div>
                   
                   <div className="grid grid-cols-3 gap-2 text-center">
-                    <div className="rounded-xl bg-black/40 px-2 py-3">
+                    <div className="rounded-xl bg-[var(--background)] px-2 py-3">
                       <p className="text-xs text-white/60">Jitter</p>
                       <p className="text-sm font-bold text-white">{latest.stats.jitter.toFixed(1)}ms</p>
                     </div>
                     <div className="rounded-xl bg-black/40 px-2 py-3">
-                      <p className="text-xs text-white/60">Trend</p>
-                      <p className="text-sm font-bold text-white">{latest.stats.trendSlope > 0 ? '📈' : latest.stats.trendSlope < 0 ? '📉' : '➡️'}</p>
+                      <p className="text-xs text-[var(--foreground-muted)]">Trend</p>
+                      <p className="text-sm font-bold">{latest.stats.trendSlope > 0 ? '📈' : latest.stats.trendSlope < 0 ? '📉' : '➡️'}</p>
                     </div>
-                    <div className="rounded-xl bg-black/40 px-2 py-3">
-                      <p className="text-xs text-white/60">Tests</p>
-                      <p className="text-sm font-bold text-white">{history.length}</p>
+                    <div className="rounded-xl bg-[var(--background)] px-2 py-3">
+                      <p className="text-xs text-[var(--foreground-muted)]">Tests</p>
+                      <p className="text-sm font-bold">{history.length}</p>
                     </div>
                   </div>
                 </div>
               )}
               
               {status === "idle" && !latest?.stats && (
-                <div className="mt-6 text-center text-sm text-white/60">
+                <div className="mt-6 text-center text-sm text-[var(--foreground-muted)]">
                   Run a test to see detailed metrics
                 </div>
               )}
             </div>
-          </header>
-
-          {/* Test section */}
-          <section className="grid gap-8 lg:grid-cols-[1.5fr,1fr]" id="test-section">
-            {/* Main test card */}
-            <div className="flex flex-col gap-6 rounded-3xl border border-white/15 bg-gradient-to-br from-white/10 via-white/5 to-transparent p-8 shadow-2xl backdrop-blur-xl">
-              <div className="flex flex-col gap-3">
-                <div className="flex items-center gap-3">
-                  <div className={`h-3 w-3 rounded-full transition-all ${running ? "bg-[#F58F7C] animate-pulse" : status === "done" ? "bg-emerald-400" : "bg-[#D6D6D6]/50"}`} />
-                  <span className="text-3xl font-bold text-white">
-                    {status === "running" && phase === "ping" && "Testing Ping..."}
-                    {status === "running" && phase === "download" && "Testing Download..."}
-                    {status === "running" && phase === "upload" && "Testing Upload..."}
-                    {status === "done" && "Complete"}
-                    {status === "idle" && "Ready"}
-                  </span>
-                </div>
-                <p className="text-sm text-[#D6D6D6]/80">
-                  {status === "idle" && "Click the button below to begin your network test. Takes about 30 seconds."}
-                  {status === "running" && phase === "ping" && "Phase 1 of 3: Measuring latency to server..."}
-                  {status === "running" && phase === "download" && "Phase 2 of 3: Measuring download throughput..."}
-                  {status === "running" && phase === "upload" && "Phase 3 of 3: Measuring upload throughput..."}
-                  {status === "done" && "Test finished! Results are based on median values for accuracy."}
-                </p>
+            
+            {/* Advanced Stats Card */}
+            <div className="rounded-3xl border border-[var(--border)] bg-[var(--card)] p-6 shadow-xl card-hover">
+              <div className="space-y-1">
+                <p className="text-xs uppercase tracking-wider text-[#ff7b6b] font-semibold">Advanced Analytics</p>
+                <h3 className="text-sm text-[var(--foreground-muted)]">Network performance insights</h3>
               </div>
-
-              <button
-                onClick={startTest}
-                disabled={running}
-                className="group relative overflow-hidden rounded-full bg-gradient-to-r from-[#F58F7C] to-[#F2C4CE] px-8 py-4 font-semibold text-[#2C2B30] shadow-2xl transition-all duration-300 hover:scale-[1.03] hover:shadow-[0_20px_40px_rgba(245,143,124,0.3)] disabled:cursor-not-allowed disabled:opacity-60 disabled:scale-100"
-              >
-                <span className="relative z-10 flex items-center gap-2">
-                  {!running && status !== "done" && "▶"}
-                  {running ? "Running test..." : status === "done" ? "Run again" : "Start test"}
-                </span>
-                <div className="absolute inset-0 scale-110 bg-white/20 opacity-0 transition-opacity duration-300 group-hover:opacity-100" aria-hidden />
-              </button>
-
-              {/* Real-time phase graph (single view) */}
-              <div className="mt-6 rounded-2xl border border-white/15 bg-gradient-to-br from-black/50 to-black/30 p-6 shadow-xl backdrop-blur-sm">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-2">
-                    <span className={`h-2.5 w-2.5 rounded-full ${running ? "animate-pulse" : ""} ${phase === "ping" ? "bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,0.6)]" : phase === "download" ? "bg-[#F58F7C] shadow-[0_0_12px_rgba(245,143,124,0.6)]" : phase === "upload" ? "bg-[#F2C4CE] shadow-[0_0_12px_rgba(242,196,206,0.6)]" : "bg-white/30"}`} />
-                    <p className="text-sm font-semibold text-white">
-                      {phase === "ping" && "⏱ Ping Latency"}
-                      {phase === "download" && "↓ Download Speed"}
-                      {phase === "upload" && "↑ Upload Speed"}
-                      {!phase && "Test Progress"}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    {((phase === "ping" && realtimePing.length > 0) || 
-                      (phase === "download" && realtimeDown.length > 0) || 
-                      (phase === "upload" && realtimeUp.length > 0)) && (
-                      <p className="text-xs text-white/60">
-                        {phase === "ping" && `${realtimePing.length} points`}
-                        {phase === "download" && `${realtimeDown.length} points`}
-                        {phase === "upload" && `${realtimeUp.length} points`}
-                      </p>
-                    )}
-                    <p className="text-sm font-bold text-[#F58F7C]">{Math.round(progress)}%</p>
-                  </div>
-                </div>
-                
-                <div className="relative">
-                  <svg viewBox="0 0 400 60" className="w-full h-16" preserveAspectRatio="none">
-                    <defs>
-                      <linearGradient id="pingGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                        <stop offset="0%" stopColor="#34d399" stopOpacity="0.3" />
-                        <stop offset="100%" stopColor="#34d399" stopOpacity="0.05" />
-                      </linearGradient>
-                      <linearGradient id="downloadGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                        <stop offset="0%" stopColor="#F58F7C" stopOpacity="0.3" />
-                        <stop offset="100%" stopColor="#F58F7C" stopOpacity="0.05" />
-                      </linearGradient>
-                      <linearGradient id="uploadGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                        <stop offset="0%" stopColor="#F2C4CE" stopOpacity="0.3" />
-                        <stop offset="100%" stopColor="#F2C4CE" stopOpacity="0.05" />
-                      </linearGradient>
-                    </defs>
-                    
-                    {/* Grid lines */}
-                    <line x1="0" x2="400" y1="15" y2="15" stroke="rgba(255,255,255,0.03)" strokeWidth="1" />
-                    <line x1="0" x2="400" y1="30" y2="30" stroke="rgba(255,255,255,0.05)" strokeWidth="1" />
-                    <line x1="0" x2="400" y1="45" y2="45" stroke="rgba(255,255,255,0.03)" strokeWidth="1" />
-                    
-                    {phase === "ping" && realtimePing.length > 0 && (
-                      <>
-                        <path
-                          d={`${buildSparkPath(realtimePing, 400, 60)} L400,60 L0,60 Z`}
-                          fill="url(#pingGradient)"
-                        />
-                        <path
-                          d={buildSparkPath(realtimePing, 400, 60)}
-                          fill="none"
-                          stroke="#34d399"
-                          strokeWidth="3"
-                          strokeLinejoin="round"
-                          strokeLinecap="round"
-                          className="drop-shadow-[0_3px_10px_rgba(52,211,153,0.6)]"
-                        />
-                      </>
-                    )}
-                    {phase === "download" && realtimeDown.length > 0 && (
-                      <>
-                        <path
-                          d={`${buildSparkPath(realtimeDown, 400, 60)} L400,60 L0,60 Z`}
-                          fill="url(#downloadGradient)"
-                        />
-                        <path
-                          d={buildSparkPath(realtimeDown, 400, 60)}
-                          fill="none"
-                          stroke="#F58F7C"
-                          strokeWidth="3"
-                          strokeLinejoin="round"
-                          strokeLinecap="round"
-                          className="drop-shadow-[0_3px_10px_rgba(245,143,124,0.6)]"
-                        />
-                      </>
-                    )}
-                    {phase === "upload" && realtimeUp.length > 0 && (
-                      <>
-                        <path
-                          d={`${buildSparkPath(realtimeUp, 400, 60)} L400,60 L0,60 Z`}
-                          fill="url(#uploadGradient)"
-                        />
-                        <path
-                          d={buildSparkPath(realtimeUp, 400, 60)}
-                          fill="none"
-                          stroke="#F2C4CE"
-                          strokeWidth="3"
-                          strokeLinejoin="round"
-                          strokeLinecap="round"
-                          className="drop-shadow-[0_3px_10px_rgba(242,196,206,0.6)]"
-                        />
-                      </>
-                    )}
-                    <line x1="0" x2="400" y1="60" y2="60" stroke="rgba(255,255,255,0.1)" strokeWidth="1" />
-                  </svg>
-                </div>
-
-                <p className="mt-4 text-xs text-[#D6D6D6]/60 text-center">
-                  {status === "idle" && "Ready to begin • 3 phases • 30 seconds total"}
-                  {status === "running" && `Phase ${phase === "ping" ? "1" : phase === "download" ? "2" : "3"} of 3 • Sampling every 100ms, averaging over 300ms`}
-                  {status === "done" && "All phases complete • Results calculated using median values"}
-                </p>
-              </div>
-
-              <div className="mt-4 grid gap-4 sm:grid-cols-3">
-                {[
-                  { label: "Download", value: formatMbps(download), icon: "↓", color: "text-[#F58F7C]" },
-                  { label: "Upload", value: formatMbps(upload), icon: "↑", color: "text-[#F2C4CE]" },
-                  { label: "Ping", value: formatMs(ping), icon: "⏱", color: "text-emerald-400" },
-                ].map((item) => (
-                  <div
-                    key={item.label}
-                    className="flex flex-col gap-2 rounded-2xl border border-white/10 bg-black/40 px-4 py-4 transition-all hover:bg-black/60 hover:border-white/20"
-                  >
-                    <p className="text-xs uppercase tracking-wider text-[#D6D6D6]/70 font-medium">{item.icon} {item.label}</p>
-                    <p className={`text-2xl font-bold ${item.color}`}>{item.value}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Sidebar: Trends + History */}
-            <div className="flex flex-col gap-6">
-              {/* Trends */}
-              <div className="rounded-3xl border border-white/15 bg-gradient-to-br from-white/8 to-white/5 p-6 shadow-2xl backdrop-blur-xl">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs uppercase tracking-wider text-[#F2C4CE] font-semibold">Trends</p>
-                    <h3 className="text-lg font-semibold text-white">Recent runs</h3>
-                  </div>
-                  <span className="text-xs text-[#D6D6D6]/70">{history.length} run(s)</span>
-                </div>
-                <div className="mt-4 space-y-4">
-                  {[
-                    { label: "Download", color: palette.coral, values: chartValues.download },
-                    { label: "Upload", color: palette.rose, values: chartValues.upload },
-                  ].map((row) => (
-                    <div key={row.label} className="space-y-2">
-                      <div className="flex items-center gap-2 text-xs">
-                        <span className="h-2 w-2 rounded-full" style={{ background: row.color }} />
-                        <p className="text-[#D6D6D6]/85 font-medium">{row.label}</p>
-                      </div>
-                      <svg viewBox="0 0 320 60" className="w-full overflow-visible">
-                        <path
-                          d={buildSparkPath(row.values, 320, 60)}
-                          fill="none"
-                          stroke={row.color}
-                          strokeWidth="2.5"
-                          strokeLinejoin="round"
-                          strokeLinecap="round"
-                          className="drop-shadow-[0_4px_8px_rgba(0,0,0,0.3)]"
-                        />
-                      </svg>
+              
+              {latest?.stats ? (
+                <div className="mt-6 space-y-4">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="rounded-xl bg-[var(--background)] p-3 border border-[var(--border)]">
+                      <p className="text-xs text-[var(--foreground-muted)]">Jitter</p>
+                      <p className="text-lg font-bold text-[#34d399]">{latest.stats.jitter.toFixed(1)} <span className="text-xs font-normal">ms</span></p>
                     </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* History */}
-              <div className="rounded-3xl border border-white/15 bg-gradient-to-br from-white/8 to-white/5 p-6 shadow-2xl backdrop-blur-xl" id="history-section">
-                <div className="flex items-center justify-between mb-4">
-                  <div>
-                    <p className="text-xs uppercase tracking-wider text-[#F2C4CE] font-semibold">History</p>
-                    <h3 className="text-lg font-semibold text-white">Test logs</h3>
-                  </div>
-                  {history.length > 0 && (
-                    <div className="flex gap-2">
-                      <button
-                        className="text-xs text-[#D6D6D6]/70 hover:text-[#F58F7C] transition-colors font-medium"
-                        onClick={exportAsCSV}
-                        title="Export as CSV"
-                      >
-                        📊 CSV
-                      </button>
-                      <button
-                        className="text-xs text-[#D6D6D6]/70 hover:text-[#F58F7C] transition-colors font-medium"
-                        onClick={exportAsJSON}
-                        title="Export as JSON"
-                      >
-                        📄 JSON
-                      </button>
-                      <button
-                        className="text-xs text-[#D6D6D6]/70 hover:text-[#F58F7C] transition-colors font-medium"
-                        onClick={() => setHistory([])}
-                      >
-                        Clear
-                      </button>
+                    <div className="rounded-xl bg-[var(--background)] p-3 border border-[var(--border)]">
+                      <p className="text-xs text-[var(--foreground-muted)]">Std Dev</p>
+                      <p className="text-lg font-bold text-[#60a5fa]">{latest.stats.downloadStats.stdDev.toFixed(1)} <span className="text-xs font-normal">Mbps</span></p>
                     </div>
-                  )}
-                </div>
-
-                {/* Time-based analytics */}
-                {timeAnalytics && timeAnalytics.last24h.count > 0 && (
-                  <div className="mb-4 space-y-2 rounded-xl bg-black/30 border border-white/10 p-3">
-                    <p className="text-xs font-semibold text-white uppercase tracking-wider">Analytics Summary</p>
-                    {[
-                      { label: '24h', data: timeAnalytics.last24h },
-                      { label: '7d', data: timeAnalytics.last7d },
-                      { label: '30d', data: timeAnalytics.last30d },
-                    ].filter(period => period.data.count > 0).map(period => (
-                      <div key={period.label} className="flex items-center justify-between text-xs">
-                        <span className="text-white/60 font-medium">{period.label} avg:</span>
-                        <div className="flex gap-2">
-                          <span className="text-[#F58F7C]">↓{period.data.avgDown.toFixed(1)}</span>
-                          <span className="text-[#F2C4CE]">↑{period.data.avgUp.toFixed(1)}</span>
-                          <span className="text-emerald-400">⏱{period.data.avgPing.toFixed(0)}ms</span>
-                          <span className="text-white/40">({period.data.count} tests)</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                <div className="mt-4 space-y-2 max-h-64 overflow-y-auto">
-                  {history.length === 0 && (
-                    <p className="text-sm text-[#D6D6D6]/70">Run a test to see results.</p>
-                  )}
-                  {history.map((item) => (
-                    <div
-                      key={item.id}
-                      className="flex items-center justify-between rounded-xl bg-black/30 border border-white/5 px-3 py-2 text-xs hover:bg-black/50 transition-colors group"
-                    >
-                      <div className="flex gap-2 flex-1">
-                        <span className="text-[#F58F7C] font-medium">↓ {formatMbps(item.download)}</span>
-                        <span className="text-[#F2C4CE] font-medium">↑ {formatMbps(item.upload)}</span>
-                        {item.stats && (
-                          <span className="text-white/60 opacity-0 group-hover:opacity-100 transition-opacity">
-                            Grade: {item.stats.grade}
-                          </span>
-                        )}
-                      </div>
-                      <span className="text-[#D6D6D6]/60 text-xs whitespace-nowrap ml-2">
-                        {new Date(item.timestamp).toLocaleTimeString()}
-                      </span>
+                    <div className="rounded-xl bg-[var(--background)] p-3 border border-[var(--border)]">
+                      <p className="text-xs text-[var(--foreground-muted)]">P95 Down</p>
+                      <p className="text-lg font-bold text-[#ff7b6b]">{latest.stats.downloadStats.p95.toFixed(1)} <span className="text-xs font-normal">Mbps</span></p>
                     </div>
-                  ))}
+                    <div className="rounded-xl bg-[var(--background)] p-3 border border-[var(--border)]">
+                      <p className="text-xs text-[var(--foreground-muted)]">Min Down</p>
+                      <p className="text-lg font-bold text-[#fbbf24]">{latest.stats.downloadStats.min.toFixed(1)} <span className="text-xs font-normal">Mbps</span></p>
+                    </div>
+                  </div>
+                  
+                  <div className="rounded-xl bg-[var(--background)] p-4 border border-[var(--border)]">
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-xs text-[var(--foreground-muted)]">Speed Consistency</p>
+                      <p className="text-xs font-semibold text-[#34d399]">{latest.stats.stabilityScore}%</p>
+                    </div>
+                    <div className="h-2 rounded-full bg-[var(--background-secondary)] overflow-hidden">
+                      <div 
+                        className="h-full rounded-full bg-gradient-to-r from-[#ff7b6b] via-[#fbbf24] to-[#34d399] transition-all duration-500"
+                        style={{ width: `${latest.stats.stabilityScore}%` }}
+                      />
+                    </div>
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div className="mt-6 text-center text-sm text-[var(--foreground-muted)]">
+                  Complete a test to see analytics
+                </div>
+              )}
             </div>
           </section>
 
-          {/* Detailed Statistics Panel (shown after test complete) */}
-          {status === "done" && latest?.stats && (
-            <section className="rounded-3xl border border-white/15 bg-gradient-to-br from-white/8 to-white/5 p-8 shadow-2xl backdrop-blur-xl">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4">
-                <div>
-                  <p className="text-xs uppercase tracking-wider text-[#F2C4CE] font-semibold">Statistical Analysis</p>
-                  <h3 className="text-xl font-semibold text-white">Detailed Performance Metrics</h3>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className="text-6xl font-bold text-white">{latest.stats.grade}</span>
-                  <div className="flex flex-col gap-1">
-                    <span className="rounded-full px-4 py-1.5 text-sm font-semibold" style={{ backgroundColor: `${getConditionBadge(latest.stats.grade).color}20`, color: getConditionBadge(latest.stats.grade).color }}>
-                      {getConditionBadge(latest.stats.grade).label}
-                    </span>
-                    <div className="text-xs text-white/60 text-center">
-                      {latest.stats.stabilityScore}% stable
-                    </div>
-                  </div>
-                </div>
+          {/* History Section */}
+          <section className="space-y-6" id="history-section">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs uppercase tracking-wider text-[#f4b8c5] font-semibold">History</p>
+                <h3 className="text-xl font-semibold">Recent Tests</h3>
               </div>
-
-              <div className="grid gap-6 md:grid-cols-3">
-                {/* Download Stats */}
-                <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-[#F58F7C]/10 to-transparent p-5">
-                  <div className="flex items-center gap-2 mb-4">
-                    <span className="text-2xl">↓</span>
-                    <h4 className="text-sm font-semibold text-white uppercase tracking-wider">Download</h4>
-                  </div>
-                  <div className="space-y-3">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-white/60">Median:</span>
-                      <span className="font-bold text-[#F58F7C]">{latest.stats.downloadStats.median.toFixed(1)} Mbps</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-white/60">Mean:</span>
-                      <span className="font-semibold text-white">{latest.stats.downloadStats.mean.toFixed(1)} Mbps</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-white/60">Std Dev:</span>
-                      <span className="font-semibold text-white">{latest.stats.downloadStats.stdDev.toFixed(2)}</span>
-                    </div>
-                    <div className="h-px bg-white/10" />
-                    <div className="flex justify-between text-xs">
-                      <span className="text-white/50">Min:</span>
-                      <span className="text-white/80">{latest.stats.downloadStats.min.toFixed(1)}</span>
-                    </div>
-                    <div className="flex justify-between text-xs">
-                      <span className="text-white/50">Max:</span>
-                      <span className="text-white/80">{latest.stats.downloadStats.max.toFixed(1)}</span>
-                    </div>
-                    <div className="flex justify-between text-xs">
-                      <span className="text-white/50">P95:</span>
-                      <span className="text-white/80">{latest.stats.downloadStats.p95.toFixed(1)}</span>
-                    </div>
-                    <div className="flex justify-between text-xs">
-                      <span className="text-white/50">P99:</span>
-                      <span className="text-white/80">{latest.stats.downloadStats.p99.toFixed(1)}</span>
-                    </div>
-                  </div>
+              {history.length > 0 && (
+                <div className="flex gap-2">
+                  <button
+                    onClick={exportAsCSV}
+                    className="rounded-xl border border-[var(--border)] bg-[var(--card)] px-4 py-2 text-sm font-medium hover:bg-[var(--card-hover)] transition-colors ripple"
+                  >
+                    Export CSV
+                  </button>
+                  <button
+                    onClick={exportAsJSON}
+                    className="rounded-xl border border-[var(--border)] bg-[var(--card)] px-4 py-2 text-sm font-medium hover:bg-[var(--card-hover)] transition-colors ripple"
+                  >
+                    Export JSON
+                  </button>
                 </div>
-
-                {/* Upload Stats */}
-                <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-[#F2C4CE]/10 to-transparent p-5">
-                  <div className="flex items-center gap-2 mb-4">
-                    <span className="text-2xl">↑</span>
-                    <h4 className="text-sm font-semibold text-white uppercase tracking-wider">Upload</h4>
-                  </div>
-                  <div className="space-y-3">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-white/60">Median:</span>
-                      <span className="font-bold text-[#F2C4CE]">{latest.stats.uploadStats.median.toFixed(1)} Mbps</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-white/60">Mean:</span>
-                      <span className="font-semibold text-white">{latest.stats.uploadStats.mean.toFixed(1)} Mbps</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-white/60">Std Dev:</span>
-                      <span className="font-semibold text-white">{latest.stats.uploadStats.stdDev.toFixed(2)}</span>
-                    </div>
-                    <div className="h-px bg-white/10" />
-                    <div className="flex justify-between text-xs">
-                      <span className="text-white/50">Min:</span>
-                      <span className="text-white/80">{latest.stats.uploadStats.min.toFixed(1)}</span>
-                    </div>
-                    <div className="flex justify-between text-xs">
-                      <span className="text-white/50">Max:</span>
-                      <span className="text-white/80">{latest.stats.uploadStats.max.toFixed(1)}</span>
-                    </div>
-                    <div className="flex justify-between text-xs">
-                      <span className="text-white/50">P95:</span>
-                      <span className="text-white/80">{latest.stats.uploadStats.p95.toFixed(1)}</span>
-                    </div>
-                    <div className="flex justify-between text-xs">
-                      <span className="text-white/50">P99:</span>
-                      <span className="text-white/80">{latest.stats.uploadStats.p99.toFixed(1)}</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Ping & Quality Stats */}
-                <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-emerald-400/10 to-transparent p-5">
-                  <div className="flex items-center gap-2 mb-4">
-                    <span className="text-2xl">⏱</span>
-                    <h4 className="text-sm font-semibold text-white uppercase tracking-wider">Ping & Quality</h4>
-                  </div>
-                  <div className="space-y-3">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-white/60">Median:</span>
-                      <span className="font-bold text-emerald-400">{latest.stats.pingStats.median.toFixed(0)} ms</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-white/60">Jitter:</span>
-                      <span className="font-semibold text-white">{latest.stats.jitter.toFixed(1)} ms</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-white/60">Stability:</span>
-                      <span className="font-semibold text-white">{latest.stats.stabilityScore}%</span>
-                    </div>
-                    <div className="h-px bg-white/10" />
-                    <div className="flex justify-between text-xs">
-                      <span className="text-white/50">Min:</span>
-                      <span className="text-white/80">{latest.stats.pingStats.min.toFixed(0)} ms</span>
-                    </div>
-                    <div className="flex justify-between text-xs">
-                      <span className="text-white/50">Max:</span>
-                      <span className="text-white/80">{latest.stats.pingStats.max.toFixed(0)} ms</span>
-                    </div>
-                    <div className="flex justify-between text-xs">
-                      <span className="text-white/50">Trend:</span>
-                      <span className="text-white/80">
-                        {latest.stats.trendSlope > 0.5 ? '📈 Improving' : latest.stats.trendSlope < -0.5 ? '📉 Degrading' : '➡️ Stable'}
-                      </span>
-                    </div>
-                    <div className="flex justify-between text-xs">
-                      <span className="text-white/50">Variance:</span>
-                      <span className="text-white/80">{latest.stats.pingStats.stdDev.toFixed(2)}</span>
-                    </div>
-                  </div>
-                </div>
+              )}
+            </div>
+            
+            {history.length === 0 ? (
+              <div className="rounded-3xl border border-[var(--border)] bg-[var(--card)] p-12 text-center">
+                <div className="text-4xl mb-4">📊</div>
+                <p className="text-[var(--foreground-muted)]">No tests yet. Run your first test to see results here.</p>
               </div>
-
-              <div className="mt-6 rounded-xl bg-black/30 border border-white/10 p-4">
-                <p className="text-xs text-white/60 leading-relaxed">
-                  <strong className="text-white">About these statistics:</strong> Median values are used for final results as they're resistant to outliers. 
-                  Standard deviation measures consistency (lower is better). P95/P99 show the 95th/99th percentile values. 
-                  Jitter measures ping variation (lower is better for gaming/calls). 
-                  Stability score combines all metrics into a 0-100 rating. 
-                  Trend slope indicates if connection is improving, degrading, or stable during the test.
-                </p>
+            ) : (
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {history.slice(0, 6).map((result) => (
+                  <div key={result.id} className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-5 card-hover">
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="text-xs text-[var(--foreground-muted)]">{new Date(result.timestamp).toLocaleTimeString()}</span>
+                      <span className="text-lg font-bold">{result.stats?.grade || "—"}</span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2 text-center">
+                      <div>
+                        <p className="text-lg font-bold text-[#ff7b6b]">{result.download.toFixed(1)}</p>
+                        <p className="text-xs text-[var(--foreground-muted)]">↓ Mbps</p>
+                      </div>
+                      <div>
+                        <p className="text-lg font-bold text-[#f4b8c5]">{result.upload.toFixed(1)}</p>
+                        <p className="text-xs text-[var(--foreground-muted)]">↑ Mbps</p>
+                      </div>
+                      <div>
+                        <p className="text-lg font-bold text-[#34d399]">{result.ping}</p>
+                        <p className="text-xs text-[var(--foreground-muted)]">ms</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
-            </section>
-          )}
+            )}
+          </section>
 
-          {/* Baseline comparator */}
-          <section className="rounded-3xl border border-white/15 bg-gradient-to-br from-white/8 to-white/5 p-8 shadow-2xl backdrop-blur-xl" id="baseline-section">
+          {/* Baseline Section */}
+          <section className="rounded-3xl border border-[var(--border)] bg-[var(--card)] p-8 shadow-xl" id="baseline-section">
             <div className="grid gap-8 md:grid-cols-[1fr,1.2fr]">
               <div>
-                <p className="text-xs uppercase tracking-wider text-[#F2C4CE] font-semibold">ISP Baseline</p>
-                <h2 className="mt-2 text-2xl font-bold text-white">Set your expectations</h2>
-                <p className="mt-3 text-sm text-[#D6D6D6]/80">
-                  Enter your ISP plan speeds to compare against your actual test results. Stored locally on your device.
+                <p className="text-xs uppercase tracking-wider text-[#f4b8c5] font-semibold">ISP Baseline</p>
+                <h2 className="mt-2 text-2xl font-bold">Set your expectations</h2>
+                <p className="mt-3 text-sm text-[var(--foreground-muted)]">
+                  Enter your ISP plan speeds to compare against your actual test results.
                 </p>
               </div>
               <div className="grid gap-3 sm:grid-cols-3">
@@ -1184,13 +1339,13 @@ export default function Home() {
                   { label: "Ping (ms)", value: ispPing, onChange: (v: number) => setIspPing(clamp(v, 1, 200)) },
                 ].map((field) => (
                   <label key={field.label} className="flex flex-col gap-2 text-xs">
-                    <span className="text-[#D6D6D6]/80 font-medium">{field.label}</span>
+                    <span className="text-[var(--foreground-muted)] font-medium">{field.label}</span>
                     <input
                       type="number"
                       inputMode="decimal"
                       value={field.value}
                       onChange={(e) => field.onChange(Number(e.target.value) || 0)}
-                      className="rounded-lg border border-white/15 bg-black/40 px-4 py-2.5 text-white outline-none focus:border-[#F58F7C] focus:bg-black/60 transition-colors text-sm font-medium"
+                      className="rounded-xl border border-[var(--border)] bg-[var(--background)] px-4 py-3 outline-none focus:border-[#ff7b6b] transition-colors text-sm font-medium"
                     />
                   </label>
                 ))}
@@ -1199,42 +1354,24 @@ export default function Home() {
 
             {/* Comparison display */}
             {baselineCompare && (
-              <div className="mt-8 border-t border-white/10 pt-8">
-                <p className="text-xs uppercase tracking-wider text-[#D6D6D6]/70 font-semibold mb-4">Last test comparison</p>
+              <div className="mt-8 border-t border-[var(--border)] pt-8">
+                <p className="text-xs uppercase tracking-wider text-[var(--foreground-muted)] font-semibold mb-4">Last test comparison</p>
                 <div className="grid gap-3 sm:grid-cols-3">
                   {[
-                    {
-                      label: "Download",
-                      delta: baselineCompare.downDelta,
-                      unit: " Mbps",
-                      betterHigher: true,
-                    },
-                    {
-                      label: "Upload",
-                      delta: baselineCompare.upDelta,
-                      unit: " Mbps",
-                      betterHigher: true,
-                    },
-                    {
-                      label: "Ping",
-                      delta: baselineCompare.pingDelta,
-                      unit: " ms",
-                      betterHigher: false, // For ping, lower is better
-                    },
+                    { label: "Download", delta: baselineCompare.downDelta, unit: " Mbps", betterHigher: true },
+                    { label: "Upload", delta: baselineCompare.upDelta, unit: " Mbps", betterHigher: true },
+                    { label: "Ping", delta: baselineCompare.pingDelta, unit: " ms", betterHigher: false },
                   ].map((item) => {
                     const isPositive = item.delta >= 0;
                     const good = item.betterHigher ? isPositive : !isPositive;
                     const sign = item.delta > 0 ? "+" : "";
                     return (
-                      <div
-                        key={item.label}
-                        className="flex flex-col gap-2 rounded-2xl border border-white/10 bg-black/40 px-4 py-4"
-                      >
-                        <p className="text-xs uppercase tracking-wider text-[#D6D6D6]/70 font-medium">{item.label}</p>
-                        <p className={`text-xl font-bold ${good ? "text-emerald-400" : "text-[#F58F7C]"}`}>
+                      <div key={item.label} className="flex flex-col gap-2 rounded-2xl border border-[var(--border)] bg-[var(--background)] px-4 py-4 card-hover">
+                        <p className="text-xs uppercase tracking-wider text-[var(--foreground-muted)] font-medium">{item.label}</p>
+                        <p className={`text-xl font-bold ${good ? "text-[#34d399]" : "text-[#ff7b6b]"}`}>
                           {sign}{item.delta.toFixed(1)}{item.unit}
                         </p>
-                        <p className="text-xs text-[#D6D6D6]/65">
+                        <p className="text-xs text-[var(--foreground-muted)]">
                           {item.label === "Ping" 
                             ? (good ? "✓ Lower than baseline" : "⚠ Higher than baseline")
                             : (good ? "✓ On target" : "⚠ Below baseline")
@@ -1248,6 +1385,19 @@ export default function Home() {
             )}
           </section>
         </main>
+
+        {/* Results Modal */}
+        {showResultsModal && latest && (
+          <ResultsModal 
+            isOpen={showResultsModal}
+            result={latest}
+            onClose={() => setShowResultsModal(false)}
+            onRunAgain={() => {
+              setShowResultsModal(false);
+              startTest();
+            }}
+          />
+        )}
       </div>
     </div>
   );

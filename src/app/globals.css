@@ -1,23 +1,59 @@
 @import "tailwindcss";
 
 :root {
-  --background: #2c2b30;
-  --foreground: #d6d6d6;
-  --charcoal: #2c2b30;
-  --graphite: #4f4f51;
-  --silver: #d6d6d6;
-  --rose: #f2c4ce;
-  --coral: #f58f7c;
+  /* Dark theme (default) */
+  --background: #0f0f12;
+  --background-secondary: #1a1a1f;
+  --foreground: #e4e4e7;
+  --foreground-muted: #a1a1aa;
+  --card: #18181b;
+  --card-hover: #27272a;
+  --border: rgba(255, 255, 255, 0.08);
+  --border-hover: rgba(255, 255, 255, 0.15);
+  
+  /* Brand colors - refined */
+  --coral: #ff7b6b;
+  --coral-light: #ff9d91;
+  --rose: #f4b8c5;
+  --rose-light: #fad4dd;
+  --emerald: #34d399;
+  --emerald-light: #6ee7b7;
+  --blue: #60a5fa;
+  --amber: #fbbf24;
+  
+  /* Gradients */
+  --gradient-primary: linear-gradient(135deg, #ff7b6b 0%, #f4b8c5 100%);
+  --gradient-glow: radial-gradient(circle, rgba(255,123,107,0.15) 0%, transparent 70%);
+}
+
+[data-theme="light"] {
+  --background: #fafafa;
+  --background-secondary: #f4f4f5;
+  --foreground: #18181b;
+  --foreground-muted: #52525b;
+  --card: #ffffff;
+  --card-hover: #f4f4f5;
+  --border: rgba(0, 0, 0, 0.08);
+  --border-hover: rgba(0, 0, 0, 0.15);
 }
 
 @theme inline {
   --color-background: var(--background);
+  --color-background-secondary: var(--background-secondary);
   --color-foreground: var(--foreground);
-  --color-charcoal: var(--charcoal);
-  --color-graphite: var(--graphite);
-  --color-silver: var(--silver);
-  --color-rose: var(--rose);
+  --color-foreground-muted: var(--foreground-muted);
+  --color-card: var(--card);
+  --color-card-hover: var(--card-hover);
+  --color-border: var(--border);
+  --color-border-hover: var(--border-hover);
   --color-coral: var(--coral);
+  --color-coral-light: var(--coral-light);
+  --color-rose: var(--rose);
+  --color-rose-light: var(--rose-light);
+  --color-emerald: var(--emerald);
+  --color-emerald-light: var(--emerald-light);
+  --color-blue: var(--blue);
+  --color-amber: var(--amber);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
@@ -26,6 +62,7 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-geist-sans), "Neue Haas Grotesk", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 ::selection {
@@ -35,4 +72,113 @@ body {
 
 a {
   color: inherit;
+}
+
+/* Smooth theme transitions */
+* {
+  transition-property: background-color, border-color, color, fill, stroke, box-shadow;
+  transition-timing-function: ease;
+  transition-duration: 0.15s;
+}
+
+/* Button ripple effect */
+.ripple {
+  position: relative;
+  overflow: hidden;
+}
+
+.ripple::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at var(--ripple-x, 50%) var(--ripple-y, 50%), rgba(255,255,255,0.3) 0%, transparent 60%);
+  opacity: 0;
+  transform: scale(0);
+  transition: transform 0.5s ease, opacity 0.5s ease;
+}
+
+.ripple:active::after {
+  opacity: 1;
+  transform: scale(2.5);
+  transition: transform 0s, opacity 0s;
+}
+
+/* Card hover lift */
+.card-hover {
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 20px 40px -12px rgba(0, 0, 0, 0.3);
+}
+
+/* Glow effect */
+.glow-coral {
+  box-shadow: 0 0 20px rgba(255, 123, 107, 0.3), 0 0 40px rgba(255, 123, 107, 0.1);
+}
+
+.glow-emerald {
+  box-shadow: 0 0 20px rgba(52, 211, 153, 0.3), 0 0 40px rgba(52, 211, 153, 0.1);
+}
+
+/* Backdrop blur support */
+@supports (backdrop-filter: blur(12px)) {
+  .glass {
+    background: rgba(24, 24, 27, 0.7);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+  
+  [data-theme="light"] .glass {
+    background: rgba(255, 255, 255, 0.7);
+  }
+}
+
+/* Animations */
+@keyframes pulse-glow {
+  0%, 100% {
+    opacity: 1;
+    filter: drop-shadow(0 0 8px currentColor);
+  }
+  50% {
+    opacity: 0.8;
+    filter: drop-shadow(0 0 20px currentColor);
+  }
+}
+
+@keyframes spin-slow {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+.animate-spin-slow {
+  animation: spin-slow 3s linear infinite;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--background-secondary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--foreground-muted);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--foreground);
 }
