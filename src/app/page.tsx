@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { SpeedLabLogo } from "@/components/Logo";
 
+// Core data types
 type SpeedResult = {
   id: string;
   timestamp: number;
@@ -35,7 +36,59 @@ type DetailedStats = {
   p99: number;
 };
 
-// Updated color palette
+// Achievement system types
+type Achievement = {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  condition: (history: SpeedResult[]) => boolean;
+  tier: 'bronze' | 'silver' | 'gold' | 'platinum';
+};
+
+// Achievement definitions
+const ACHIEVEMENTS: Achievement[] = [
+  // Speed milestones
+  { id: 'speed_demon', name: 'Speed Demon', description: 'Reach 500+ Mbps download', icon: '🚀', tier: 'gold', condition: (h) => h.some(r => r.download >= 500) },
+  { id: 'century_club', name: 'Century Club', description: 'Reach 100+ Mbps download', icon: '💯', tier: 'bronze', condition: (h) => h.some(r => r.download >= 100) },
+  { id: 'gigabit_glory', name: 'Gigabit Glory', description: 'Reach 1000+ Mbps download', icon: '⚡', tier: 'platinum', condition: (h) => h.some(r => r.download >= 1000) },
+  
+  // Consistency achievements
+  { id: 'stable_connection', name: 'Stable Connection', description: 'Get 90%+ stability score', icon: '📊', tier: 'silver', condition: (h) => h.some(r => (r.stats?.stabilityScore || 0) >= 90) },
+  { id: 'rock_solid', name: 'Rock Solid', description: 'Get 95%+ stability 3 times', icon: '🪨', tier: 'gold', condition: (h) => h.filter(r => (r.stats?.stabilityScore || 0) >= 95).length >= 3 },
+  
+  // Ping achievements
+  { id: 'quick_reflexes', name: 'Quick Reflexes', description: 'Get ping under 10ms', icon: '⚡', tier: 'gold', condition: (h) => h.some(r => r.ping < 10) },
+  { id: 'low_latency', name: 'Low Latency', description: 'Get ping under 20ms', icon: '🎯', tier: 'silver', condition: (h) => h.some(r => r.ping < 20) },
+  { id: 'gaming_ready', name: 'Gaming Ready', description: 'Jitter under 5ms', icon: '🎮', tier: 'silver', condition: (h) => h.some(r => (r.stats?.jitter || 999) < 5) },
+  
+  // Testing habits
+  { id: 'first_test', name: 'First Steps', description: 'Complete your first test', icon: '🎉', tier: 'bronze', condition: (h) => h.length >= 1 },
+  { id: 'dedicated_tester', name: 'Dedicated Tester', description: 'Complete 10 tests', icon: '🔬', tier: 'bronze', condition: (h) => h.length >= 10 },
+  { id: 'data_collector', name: 'Data Collector', description: 'Complete 25 tests', icon: '📈', tier: 'silver', condition: (h) => h.length >= 25 },
+  { id: 'speed_scientist', name: 'Speed Scientist', description: 'Complete 50 tests', icon: '🧪', tier: 'gold', condition: (h) => h.length >= 50 },
+  
+  // Grade achievements
+  { id: 'honor_roll', name: 'Honor Roll', description: 'Get an A+ grade', icon: '🏆', tier: 'gold', condition: (h) => h.some(r => r.stats?.grade === 'A+') },
+  { id: 'consistent_performer', name: 'Consistent Performer', description: 'Get 5 A grades in a row', icon: '⭐', tier: 'platinum', condition: (h) => {
+    if (h.length < 5) return false;
+    return h.slice(0, 5).every(r => r.stats?.grade?.startsWith('A'));
+  }},
+  
+  // Network variety
+  { id: 'network_explorer', name: 'Network Explorer', description: 'Test on WiFi, Ethernet & Mobile', icon: '🌐', tier: 'silver', condition: (h) => {
+    const types = new Set(h.map(r => r.networkType).filter(Boolean));
+    return types.has('wifi') && types.has('ethernet') && types.has('mobile');
+  }},
+  
+  // Location achievements  
+  { id: 'home_mapper', name: 'Home Mapper', description: 'Test from 3+ locations', icon: '🗺️', tier: 'silver', condition: (h) => {
+    const locations = new Set(h.map(r => r.location).filter(Boolean));
+    return locations.size >= 3;
+  }},
+];
+
+// Theme color palette
 const colors = {
   coral: "#ff7b6b",
   coralLight: "#ff9d91",
