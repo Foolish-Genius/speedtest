@@ -1490,8 +1490,39 @@ export default function Home() {
     };
   }, [history]);
 
+  // Generate screen reader announcement for current test status
+  const getStatusAnnouncement = () => {
+    if (status === 'running') {
+      if (phase === 'ping') return `Testing ping. Current ping: ${ping.toFixed(0)} milliseconds`;
+      if (phase === 'download') return `Testing download speed. Current: ${download.toFixed(1)} megabits per second`;
+      if (phase === 'upload') return `Testing upload speed. Current: ${upload.toFixed(1)} megabits per second`;
+    }
+    if (status === 'done' && latest) {
+      return `Test complete. Download: ${latest.download.toFixed(1)} megabits per second, Upload: ${latest.upload.toFixed(1)} megabits per second, Ping: ${latest.ping} milliseconds. Grade: ${latest.stats?.grade || 'Not rated'}`;
+    }
+    return '';
+  };
+
   return (
     <div className="min-h-screen bg-[var(--background)] text-[var(--foreground)] transition-colors duration-300">
+      {/* Skip to main content link for keyboard users */}
+      <a 
+        href="#test-section" 
+        className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-[100] focus:px-4 focus:py-2 focus:bg-[#ff7b6b] focus:text-white focus:rounded-lg focus:font-medium"
+      >
+        Skip to main content
+      </a>
+      
+      {/* Live region for screen reader announcements */}
+      <div 
+        role="status" 
+        aria-live="polite" 
+        aria-atomic="true" 
+        className="sr-only"
+      >
+        {getStatusAnnouncement()}
+      </div>
+      
       {/* Results Modal */}
       <ResultsModal 
         isOpen={showResultsModal} 
@@ -1586,25 +1617,26 @@ export default function Home() {
       
       <div className="relative overflow-hidden">
         {/* Gradient orbs */}
-        <div className="pointer-events-none absolute inset-0 opacity-30" aria-hidden>
+        <div className="pointer-events-none absolute inset-0 opacity-30" aria-hidden="true">
           <div className="absolute -left-32 top-5 h-72 w-72 rounded-full bg-[#f4b8c5] blur-[140px]" />
           <div className="absolute -right-20 top-48 h-96 w-96 rounded-full bg-[#ff7b6b] blur-[160px]" />
           <div className="absolute left-1/2 top-96 h-64 w-64 rounded-full bg-[#34d399] blur-[120px] opacity-30" />
         </div>
 
         {/* Navbar */}
-        <nav className="relative border-b border-[var(--border)] bg-[var(--card)]/80 backdrop-blur-xl sticky top-0 z-40">
+        <nav className="relative border-b border-[var(--border)] bg-[var(--card)]/80 backdrop-blur-xl sticky top-0 z-40" role="navigation" aria-label="Main navigation">
           <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4 sm:px-10 md:px-14">
             <div className="flex items-center gap-3">
               <SpeedLabLogo />
-              <span className="text-lg font-bold">Speed Labs</span>
+              <span className="text-lg font-bold" aria-label="Speed Labs - Internet Speed Test">Speed Labs</span>
             </div>
-            <div className="hidden items-center gap-8 md:flex">
+            <div className="hidden items-center gap-8 md:flex" role="menubar">
               <button 
                 onClick={() => {
                   const testSection = document.getElementById("test-section");
                   testSection?.scrollIntoView({ behavior: "smooth" });
                 }}
+                role="menuitem"
                 className="text-sm text-[var(--foreground-muted)] hover:text-[#ff7b6b] transition-colors font-medium"
               >
                 Test
@@ -1614,6 +1646,7 @@ export default function Home() {
                   const historySection = document.getElementById("history-section");
                   historySection?.scrollIntoView({ behavior: "smooth" });
                 }}
+                role="menuitem"
                 className="text-sm text-[var(--foreground-muted)] hover:text-[#ff7b6b] transition-colors font-medium"
               >
                 History
@@ -1710,9 +1743,9 @@ export default function Home() {
           )}
         </nav>
 
-        <main className="relative mx-auto flex max-w-6xl flex-col gap-6 px-6 pb-20 pt-2 sm:px-10 md:px-14">
+        <main className="relative mx-auto flex max-w-6xl flex-col gap-6 px-6 pb-20 pt-2 sm:px-10 md:px-14" role="main" aria-label="Speed test application">
           {/* Hero section - Speedometer left, Stats right */}
-          <header className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start" id="test-section">
+          <header className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start" id="test-section" role="region" aria-label="Speed test controls and results">
             {/* Left side - Speedometer + Graph */}
             <div className="flex flex-col items-center gap-2">
               <Speedometer 
@@ -1801,56 +1834,58 @@ export default function Home() {
               </div>
 
               {/* Stacked Stats - Download, Upload, Ping */}
-              <div className="flex flex-col gap-1.5">
-                <div className="flex items-center p-2.5 rounded-lg bg-[var(--card)] border border-[var(--border)]">
+              <div className="flex flex-col gap-1.5" role="region" aria-label="Current speed metrics">
+                <div className="flex items-center p-2.5 rounded-lg bg-[var(--card)] border border-[var(--border)]" role="group" aria-label="Download speed">
                   <div className="flex items-center gap-2.5 flex-1">
-                    <div className="w-8 h-8 rounded-md bg-[#ff7b6b]/20 flex items-center justify-center">
+                    <div className="w-8 h-8 rounded-md bg-[#ff7b6b]/20 flex items-center justify-center" aria-hidden="true">
                       <span className="text-[#ff7b6b] text-sm">↓</span>
                     </div>
                     <div className="flex items-baseline gap-1">
-                      <p className="text-lg font-bold text-[#ff7b6b]">{download.toFixed(1)}</p>
-                      <p className="text-xs text-[var(--foreground-muted)]">Mbps</p>
+                      <p className="text-lg font-bold text-[#ff7b6b]" aria-label={`Download speed: ${download.toFixed(1)} megabits per second`}>{download.toFixed(1)}</p>
+                      <p className="text-xs text-[var(--foreground-muted)]" aria-hidden="true">Mbps</p>
                     </div>
                   </div>
-                  <p className="text-[10px] text-[var(--foreground-muted)] uppercase">Download</p>
+                  <p className="text-[10px] text-[var(--foreground-muted)] uppercase" aria-hidden="true">Download</p>
                 </div>
-                <div className="flex items-center p-2.5 rounded-lg bg-[var(--card)] border border-[var(--border)]">
+                <div className="flex items-center p-2.5 rounded-lg bg-[var(--card)] border border-[var(--border)]" role="group" aria-label="Upload speed">
                   <div className="flex items-center gap-2.5 flex-1">
-                    <div className="w-8 h-8 rounded-md bg-[#f4b8c5]/20 flex items-center justify-center">
+                    <div className="w-8 h-8 rounded-md bg-[#f4b8c5]/20 flex items-center justify-center" aria-hidden="true">
                       <span className="text-[#f4b8c5] text-sm">↑</span>
                     </div>
                     <div className="flex items-baseline gap-1">
-                      <p className="text-lg font-bold text-[#f4b8c5]">{upload.toFixed(1)}</p>
-                      <p className="text-xs text-[var(--foreground-muted)]">Mbps</p>
+                      <p className="text-lg font-bold text-[#f4b8c5]" aria-label={`Upload speed: ${upload.toFixed(1)} megabits per second`}>{upload.toFixed(1)}</p>
+                      <p className="text-xs text-[var(--foreground-muted)]" aria-hidden="true">Mbps</p>
                     </div>
                   </div>
-                  <p className="text-[10px] text-[var(--foreground-muted)] uppercase">Upload</p>
+                  <p className="text-[10px] text-[var(--foreground-muted)] uppercase" aria-hidden="true">Upload</p>
                 </div>
-                <div className="flex items-center p-2.5 rounded-lg bg-[var(--card)] border border-[var(--border)]">
+                <div className="flex items-center p-2.5 rounded-lg bg-[var(--card)] border border-[var(--border)]" role="group" aria-label="Ping latency">
                   <div className="flex items-center gap-2.5 flex-1">
-                    <div className="w-8 h-8 rounded-md bg-[#34d399]/20 flex items-center justify-center">
+                    <div className="w-8 h-8 rounded-md bg-[#34d399]/20 flex items-center justify-center" aria-hidden="true">
                       <span className="text-[#34d399] text-sm">⏱</span>
                     </div>
                     <div className="flex items-baseline gap-1">
-                      <p className="text-lg font-bold text-[#34d399]">{ping.toFixed(0)}</p>
-                      <p className="text-xs text-[var(--foreground-muted)]">ms</p>
+                      <p className="text-lg font-bold text-[#34d399]" aria-label={`Ping latency: ${ping.toFixed(0)} milliseconds`}>{ping.toFixed(0)}</p>
+                      <p className="text-xs text-[var(--foreground-muted)]" aria-hidden="true">ms</p>
                     </div>
                   </div>
-                  <p className="text-[10px] text-[var(--foreground-muted)] uppercase">Ping</p>
+                  <p className="text-[10px] text-[var(--foreground-muted)] uppercase" aria-hidden="true">Ping</p>
                 </div>
               </div>
 
               {/* Test Buttons */}
-              <div className="flex gap-2">
+              <div className="flex gap-2" role="group" aria-label="Speed test controls">
                 <button
                   onClick={() => startTest(false)}
                   disabled={running}
+                  aria-busy={running && !incognitoMode}
+                  aria-label={running && !incognitoMode ? 'Speed test in progress' : status === 'done' ? 'Run speed test again' : 'Start speed test'}
                   className="group relative overflow-hidden rounded-full bg-gradient-to-r from-[#ff7b6b] to-[#f4b8c5] px-5 py-3 font-semibold text-white shadow-2xl transition-all duration-300 hover:scale-[1.02] hover:shadow-[0_20px_40px_rgba(255,123,107,0.3)] disabled:cursor-not-allowed disabled:opacity-60 disabled:scale-100 text-sm ripple flex-1"
                 >
                   <span className="relative z-10 flex items-center justify-center gap-2">
                     {running && !incognitoMode ? (
                       <>
-                        <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24" aria-hidden="true">
                           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                         </svg>
@@ -1877,13 +1912,13 @@ export default function Home() {
                   <span className="relative z-10 flex items-center justify-center gap-2">
                     {running && incognitoMode ? (
                       <>
-                        <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24" aria-hidden="true">
                           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                         </svg>
                       </>
                     ) : (
-                      <span className="text-base">🕵️</span>
+                      <span className="text-base" aria-hidden="true">🕵️</span>
                     )}
                   </span>
                 </button>
@@ -1892,9 +1927,11 @@ export default function Home() {
               {/* Test Options Toggle */}
               <button
                 onClick={() => setShowSettings(!showSettings)}
+                aria-expanded={showSettings}
+                aria-controls="test-options-panel"
                 className="flex items-center justify-center gap-2 text-xs text-[var(--foreground-muted)] hover:text-[var(--foreground)] transition-colors"
               >
-                <svg className={`w-4 h-4 transition-transform ${showSettings ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className={`w-4 h-4 transition-transform ${showSettings ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                 </svg>
                 Test Options
@@ -1902,16 +1939,18 @@ export default function Home() {
 
               {/* Test Options Panel */}
               {showSettings && (
-                <div className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-4 space-y-4">
+                <div id="test-options-panel" role="region" aria-label="Test configuration options" className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-4 space-y-4">
                   {/* Test Profile */}
-                  <div>
-                    <label className="text-xs text-[var(--foreground-muted)] uppercase tracking-wider mb-2 block">Test Duration</label>
-                    <div className="flex gap-1">
+                  <div role="group" aria-labelledby="test-duration-label">
+                    <label id="test-duration-label" className="text-xs text-[var(--foreground-muted)] uppercase tracking-wider mb-2 block">Test Duration</label>
+                    <div className="flex gap-1" role="radiogroup">
                       {(['quick', 'standard', 'extended'] as TestProfile[]).map((profile) => (
                         <button
                           key={profile}
                           onClick={() => setTestProfile(profile)}
                           disabled={running}
+                          role="radio"
+                          aria-checked={testProfile === profile}
                           className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium transition-all ${
                             testProfile === profile
                               ? 'bg-gradient-to-r from-[#ff7b6b] to-[#f4b8c5] text-white'
