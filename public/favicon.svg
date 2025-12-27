@@ -1,9 +1,9 @@
 <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
   <defs>
     <linearGradient id="speedLabGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#F58F7C" />
-      <stop offset="50%" stop-color="#F2A098" />
-      <stop offset="100%" stop-color="#F2C4CE" />
+      <stop offset="0%" stop-color="#3B82F6" />
+      <stop offset="50%" stop-color="#60A5FA" />
+      <stop offset="100%" stop-color="#93C5FD" />
     </linearGradient>
     <linearGradient id="glowGradient" x1="50%" y1="0%" x2="50%" y2="100%">
       <stop offset="0%" stop-color="#fff" stop-opacity="0.3" />

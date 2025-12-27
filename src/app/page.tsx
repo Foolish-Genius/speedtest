@@ -1626,20 +1626,26 @@ export default function Home() {
         </div>
 
         {/* Navbar */}
-        <nav className="relative border-b border-[var(--border)] bg-[var(--card)]/80 backdrop-blur-xl sticky top-0 z-40" role="navigation" aria-label="Main navigation">
-          <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4 sm:px-10 md:px-14">
-            <div className="flex items-center gap-3">
-              <SpeedLabLogo />
-              <span className="text-lg font-bold" aria-label="Speed Labs - Internet Speed Test">Speed Labs</span>
+        <nav className="relative border-b border-[var(--border)]/50 bg-[var(--card)]/60 backdrop-blur-2xl sticky top-0 z-40 shadow-sm" role="navigation" aria-label="Main navigation">
+          <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-3 sm:px-10 md:px-14">
+            <div className="flex items-center gap-2.5 group cursor-pointer" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
+              <div className="relative">
+                <div className="absolute inset-0 bg-[#3B82F6]/20 blur-lg rounded-full group-hover:bg-[#3B82F6]/30 transition-all" />
+                <SpeedLabLogo />
+              </div>
+              <div className="flex flex-col">
+                <span className="text-base font-bold tracking-tight" aria-label="Speed Labs - Internet Speed Test">Speed Labs</span>
+                <span className="text-[9px] text-[var(--foreground-muted)] -mt-0.5 tracking-wide">NETWORK ANALYZER</span>
+              </div>
             </div>
-            <div className="hidden items-center gap-8 md:flex" role="menubar">
+            <div className="hidden items-center gap-1 md:flex" role="menubar">
               <button 
                 onClick={() => {
                   const testSection = document.getElementById("test-section");
                   testSection?.scrollIntoView({ behavior: "smooth" });
                 }}
                 role="menuitem"
-                className="text-sm text-[var(--foreground-muted)] hover:text-[#ff7b6b] transition-colors font-medium"
+                className="px-3 py-1.5 rounded-lg text-sm text-[var(--foreground-muted)] hover:text-[var(--foreground)] hover:bg-[var(--background-secondary)] transition-all font-medium"
               >
                 Test
               </button>
@@ -1649,7 +1655,7 @@ export default function Home() {
                   historySection?.scrollIntoView({ behavior: "smooth" });
                 }}
                 role="menuitem"
-                className="text-sm text-[var(--foreground-muted)] hover:text-[#ff7b6b] transition-colors font-medium"
+                className="px-3 py-1.5 rounded-lg text-sm text-[var(--foreground-muted)] hover:text-[var(--foreground)] hover:bg-[var(--background-secondary)] transition-all font-medium"
               >
                 History
               </button>
@@ -1658,23 +1664,27 @@ export default function Home() {
                   const baselineSection = document.getElementById("baseline-section");
                   baselineSection?.scrollIntoView({ behavior: "smooth" });
                 }}
-                className="text-sm text-[var(--foreground-muted)] hover:text-[#ff7b6b] transition-colors font-medium"
+                className="px-3 py-1.5 rounded-lg text-sm text-[var(--foreground-muted)] hover:text-[var(--foreground)] hover:bg-[var(--background-secondary)] transition-all font-medium"
               >
                 Baseline
               </button>
+              <div className="w-px h-5 bg-[var(--border)] mx-2" />
               <button 
                 onClick={() => setShowAchievements(true)}
-                className="text-sm text-[var(--foreground-muted)] hover:text-[#ff7b6b] transition-colors font-medium flex items-center gap-1"
+                className="px-3 py-1.5 rounded-lg text-sm text-[var(--foreground-muted)] hover:text-[var(--foreground)] hover:bg-[var(--background-secondary)] transition-all font-medium flex items-center gap-1.5"
               >
-                🏆 <span className="text-xs bg-[var(--background-secondary)] px-1.5 py-0.5 rounded-full">{achievementProgress.unlocked}</span>
+                <span className="text-sm">🏆</span>
+                <span className="text-[10px] bg-gradient-to-r from-[#3B82F6] to-[#60A5FA] text-white px-1.5 py-0.5 rounded-full font-semibold">{achievementProgress.unlocked}</span>
               </button>
               <button
                 onClick={() => setHighContrast(!highContrast)}
-                className={`text-sm transition-colors font-medium ${highContrast ? 'text-[#ff7b6b]' : 'text-[var(--foreground-muted)] hover:text-[#ff7b6b]'}`}
+                className={`p-2 rounded-lg transition-all ${highContrast ? 'bg-[#3B82F6]/20 text-[#3B82F6]' : 'text-[var(--foreground-muted)] hover:text-[var(--foreground)] hover:bg-[var(--background-secondary)]'}`}
                 title="Toggle high contrast mode"
                 aria-label="Toggle high contrast mode"
               >
-                {highContrast ? '◐' : '◑'}
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                </svg>
               </button>
               <ThemeToggle theme={theme} setTheme={setTheme} />
             </div>
@@ -2610,6 +2620,53 @@ export default function Home() {
             </section>
           )}
 
+          {/* Performance Benchmarks - Compact Grid */}
+          {latest && (
+            <section className="rounded-3xl border border-[var(--border)] bg-[var(--card)] p-6 shadow-xl">
+              <div className="flex items-center justify-between mb-4">
+                <div className="space-y-1">
+                  <p className="text-xs uppercase tracking-wider text-[#a78bfa] font-semibold">Performance Benchmarks</p>
+                  <h3 className="text-sm text-[var(--foreground-muted)]">Industry standards comparison</h3>
+                </div>
+                <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                  latest.download >= 100 ? 'bg-[#34d399]/20 text-[#34d399]' :
+                  latest.download >= 25 ? 'bg-[#60a5fa]/20 text-[#60a5fa]' :
+                  latest.download >= 10 ? 'bg-[#fbbf24]/20 text-[#fbbf24]' : 'bg-[#ff7b6b]/20 text-[#ff7b6b]'
+                }`}>
+                  {latest.download >= 100 ? '🚀 Power User' :
+                   latest.download >= 50 ? '✨ All Supported' :
+                   latest.download >= 25 ? '👍 Most Supported' :
+                   latest.download >= 10 ? '⚠️ Basic Only' : '❌ Limited'}
+                </span>
+              </div>
+              
+              {/* Compact Grid */}
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
+                {[
+                  { name: 'HD Stream', required: 5, icon: '📺' },
+                  { name: '4K Stream', required: 25, icon: '🎬' },
+                  { name: 'Gaming', required: 10, icon: '🎮' },
+                  { name: 'Video Calls', required: 3, icon: '💻' },
+                  { name: 'Remote Work', required: 10, icon: '🏠' },
+                  { name: 'Downloads', required: 25, icon: '📦' }
+                ].map((b) => {
+                  const ok = latest.download >= b.required;
+                  return (
+                    <div key={b.name} className={`rounded-xl p-3 border text-center transition-all ${
+                      ok ? 'bg-[#34d399]/10 border-[#34d399]/30' : 'bg-[#ff7b6b]/10 border-[#ff7b6b]/30'
+                    }`}>
+                      <span className="text-lg">{b.icon}</span>
+                      <p className="text-xs font-medium mt-1">{b.name}</p>
+                      <p className={`text-[10px] font-semibold ${ok ? 'text-[#34d399]' : 'text-[#ff7b6b]'}`}>
+                        {ok ? '✓' : '✗'} {b.required} Mbps
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+          )}
+
           {/* Privacy Report */}
           <section className="rounded-3xl border border-[var(--border)] bg-[var(--card)] p-6 shadow-xl">
             <div className="space-y-1 mb-6">
@@ -2748,53 +2805,6 @@ export default function Home() {
               </div>
             </div>
           </section>
-
-          {/* Performance Benchmarks - Compact Grid */}
-          {latest && (
-            <section className="rounded-3xl border border-[var(--border)] bg-[var(--card)] p-6 shadow-xl">
-              <div className="flex items-center justify-between mb-4">
-                <div className="space-y-1">
-                  <p className="text-xs uppercase tracking-wider text-[#a78bfa] font-semibold">Performance Benchmarks</p>
-                  <h3 className="text-sm text-[var(--foreground-muted)]">Industry standards comparison</h3>
-                </div>
-                <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                  latest.download >= 100 ? 'bg-[#34d399]/20 text-[#34d399]' :
-                  latest.download >= 25 ? 'bg-[#60a5fa]/20 text-[#60a5fa]' :
-                  latest.download >= 10 ? 'bg-[#fbbf24]/20 text-[#fbbf24]' : 'bg-[#ff7b6b]/20 text-[#ff7b6b]'
-                }`}>
-                  {latest.download >= 100 ? '🚀 Power User' :
-                   latest.download >= 50 ? '✨ All Supported' :
-                   latest.download >= 25 ? '👍 Most Supported' :
-                   latest.download >= 10 ? '⚠️ Basic Only' : '❌ Limited'}
-                </span>
-              </div>
-              
-              {/* Compact Grid */}
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
-                {[
-                  { name: 'HD Stream', required: 5, icon: '📺' },
-                  { name: '4K Stream', required: 25, icon: '🎬' },
-                  { name: 'Gaming', required: 10, icon: '🎮' },
-                  { name: 'Video Calls', required: 3, icon: '💻' },
-                  { name: 'Remote Work', required: 10, icon: '🏠' },
-                  { name: 'Downloads', required: 25, icon: '📦' }
-                ].map((b) => {
-                  const ok = latest.download >= b.required;
-                  return (
-                    <div key={b.name} className={`rounded-xl p-3 border text-center transition-all ${
-                      ok ? 'bg-[#34d399]/10 border-[#34d399]/30' : 'bg-[#ff7b6b]/10 border-[#ff7b6b]/30'
-                    }`}>
-                      <span className="text-lg">{b.icon}</span>
-                      <p className="text-xs font-medium mt-1">{b.name}</p>
-                      <p className={`text-[10px] font-semibold ${ok ? 'text-[#34d399]' : 'text-[#ff7b6b]'}`}>
-                        {ok ? '✓' : '✗'} {b.required} Mbps
-                      </p>
-                    </div>
-                  );
-                })}
-              </div>
-            </section>
-          )}
 
           {/* History Section */}
           <section className="space-y-6" id="history-section">
