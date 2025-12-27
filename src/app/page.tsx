@@ -9,6 +9,25 @@ type SpeedResult = {
   download: number;
   upload: number;
   ping: number;
+  stats?: {
+    downloadStats: DetailedStats;
+    uploadStats: DetailedStats;
+    pingStats: DetailedStats;
+    jitter: number;
+    stabilityScore: number;
+    grade: string;
+    trendSlope: number; // positive = improving, negative = degrading
+  };
+};
+
+type DetailedStats = {
+  mean: number;
+  median: number;
+  min: number;
+  max: number;
+  stdDev: number;
+  p95: number;
+  p99: number;
 };
 
 const palette = {
@@ -23,6 +42,151 @@ const formatMbps = (value: number) => `${value.toFixed(1)} Mbps`;
 const formatMs = (value: number) => `${value.toFixed(0)} ms`;
 const clamp = (value: number, min: number, max: number) =>
   Math.min(Math.max(value, min), max);
+
+// Comprehensive statistical analysis
+const calculateDetailedStats = (values: number[]): DetailedStats => {
+  if (!values.length) return { mean: 0, median: 0, min: 0, max: 0, stdDev: 0, p95: 0, p99: 0 };
+  
+  const sorted = [...values].sort((a, b) => a - b);
+  const n = sorted.length;
+  
+  // Mean
+  const mean = values.reduce((a, b) => a + b, 0) / n;
+  
+  // Median
+  const mid = Math.floor(n / 2);
+  const median = n % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+  
+  // Min and Max
+  const min = sorted[0];
+  const max = sorted[n - 1];
+  
+  // Standard deviation
+  const variance = values.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / n;
+  const stdDev = Math.sqrt(variance);
+  
+  // Percentiles
+  const p95Index = Math.ceil(n * 0.95) - 1;
+  const p99Index = Math.ceil(n * 0.99) - 1;
+  const p95 = sorted[p95Index];
+  const p99 = sorted[p99Index];
+  
+  return { mean, median, min, max, stdDev, p95, p99 };
+};
+
+// Calculate jitter (variation in ping)
+const calculateJitter = (pingValues: number[]): number => {
+  if (pingValues.length < 2) return 0;
+  let sumDiff = 0;
+  for (let i = 1; i < pingValues.length; i++) {
+    sumDiff += Math.abs(pingValues[i] - pingValues[i - 1]);
+  }
+  return sumDiff / (pingValues.length - 1);
+};
+
+// Calculate stability score (0-100, higher is better)
+const calculateStabilityScore = (stats: DetailedStats): number => {
+  // Lower coefficient of variation = more stable
+  if (stats.mean === 0) return 0;
+  const coefficientOfVariation = stats.stdDev / stats.mean;
+  // Map CV to 0-100 scale (CV < 0.1 = excellent, CV > 0.5 = poor)
+  const score = Math.max(0, Math.min(100, 100 - coefficientOfVariation * 200));
+  return Math.round(score);
+};
+
+// Linear regression to detect trend (improving vs degrading)
+const calculateTrendSlope = (values: number[]): number => {
+  if (values.length < 2) return 0;
+  const n = values.length;
+  const xValues = values.map((_, i) => i);
+  const xMean = (n - 1) / 2;
+  const yMean = values.reduce((a, b) => a + b, 0) / n;
+  
+  let numerator = 0;
+  let denominator = 0;
+  
+  for (let i = 0; i < n; i++) {
+    numerator += (xValues[i] - xMean) * (values[i] - yMean);
+    denominator += Math.pow(xValues[i] - xMean, 2);
+  }
+  
+  return denominator === 0 ? 0 : numerator / denominator;
+};
+
+// Grade based on ISP expectations
+const calculateGrade = (actual: number, expected: number, type: 'download' | 'upload' | 'ping'): string => {
+  if (type === 'ping') {
+    // Lower is better for ping
+    if (actual <= expected * 0.5) return 'A+';
+    if (actual <= expected * 0.75) return 'A';
+    if (actual <= expected) return 'B';
+    if (actual <= expected * 1.5) return 'C';
+    if (actual <= expected * 2) return 'D';
+    return 'F';
+  } else {
+    // Higher is better for download/upload
+    if (actual >= expected * 1.2) return 'A+';
+    if (actual >= expected) return 'A';
+    if (actual >= expected * 0.8) return 'B';
+    if (actual >= expected * 0.6) return 'C';
+    if (actual >= expected * 0.4) return 'D';
+    return 'F';
+  }
+};
+
+const getConditionBadge = (grade: string): { label: string; color: string } => {
+  if (grade.startsWith('A')) return { label: 'Excellent', color: '#10b981' };
+  if (grade === 'B') return { label: 'Good', color: '#3b82f6' };
+  if (grade === 'C') return { label: 'Fair', color: '#f59e0b' };
+  if (grade === 'D') return { label: 'Poor', color: '#ef4444' };
+  return { label: 'Very Poor', color: '#dc2626' };
+};
+
+// Circular gauge component for real-time metrics
+const CircularGauge = ({ value, max, label, unit, color, size = 140 }: { value: number; max: number; label: string; unit: string; color: string; size?: number }) => {
+  const percentage = Math.min((value / max) * 100, 100);
+  const radius = (size - 20) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const offset = circumference - (percentage / 100) * circumference;
+  
+  return (
+    <div className="flex flex-col items-center gap-3">
+      <div className="relative" style={{ width: size, height: size }}>
+        <svg width={size} height={size} className="-rotate-90 transform">
+          {/* Background circle */}
+          <circle
+            cx={size / 2}
+            cy={size / 2}
+            r={radius}
+            fill="none"
+            stroke="rgba(255,255,255,0.08)"
+            strokeWidth="10"
+          />
+          {/* Progress circle */}
+          <circle
+            cx={size / 2}
+            cy={size / 2}
+            r={radius}
+            fill="none"
+            stroke={color}
+            strokeWidth="10"
+            strokeDasharray={circumference}
+            strokeDashoffset={offset}
+            strokeLinecap="round"
+            className="transition-all duration-500 ease-out"
+            style={{ filter: `drop-shadow(0 0 6px ${color})` }}
+          />
+        </svg>
+        {/* Center text */}
+        <div className="absolute inset-0 flex flex-col items-center justify-center">
+          <span className="text-2xl font-bold text-white">{value.toFixed(value >= 100 ? 0 : 1)}</span>
+          <span className="text-xs text-white/60">{unit}</span>
+        </div>
+      </div>
+      <span className="text-sm font-medium text-white/80">{label}</span>
+    </div>
+  );
+};
 
 const buildSparkPath = (values: number[], width = 320, height = 90) => {
   if (!values.length) return "";
@@ -232,19 +396,59 @@ export default function Home() {
         if (phaseProgress < 100) {
           requestAnimationFrame(step);
         } else {
-          // All phases complete
+          // All phases complete - Calculate comprehensive statistics
           setSamples((prev) => {
             const allSamples = { ...prev, up: uploadSamples };
-            const finalPing = computeMedian(allSamples.ping);
-            const finalDownload = computeMedian(allSamples.down);
-            const finalUpload = computeMedian(allSamples.up);
+            
+            // Calculate detailed stats for each metric
+            const downloadStats = calculateDetailedStats(allSamples.down);
+            const uploadStats = calculateDetailedStats(allSamples.up);
+            const pingStats = calculateDetailedStats(allSamples.ping);
+            
+            // Calculate jitter
+            const jitter = calculateJitter(allSamples.ping);
+            
+            // Calculate stability score (based on download consistency)
+            const stabilityScore = calculateStabilityScore(downloadStats);
+            
+            // Calculate trend slopes
+            const downloadTrend = calculateTrendSlope(allSamples.down);
+            const uploadTrend = calculateTrendSlope(allSamples.up);
+            const pingTrend = calculateTrendSlope(allSamples.ping);
+            const trendSlope = (downloadTrend + uploadTrend - pingTrend) / 3; // Combined trend
+            
+            // Calculate grades
+            const downGrade = calculateGrade(downloadStats.median, ispDown, 'download');
+            const upGrade = calculateGrade(uploadStats.median, ispUp, 'upload');
+            const pingGrade = calculateGrade(pingStats.median, ispPing, 'ping');
+            
+            // Overall grade (average of the three)
+            const gradeValues = { 'A+': 4.3, 'A': 4.0, 'B': 3.0, 'C': 2.0, 'D': 1.0, 'F': 0 };
+            const avgGradeValue = (gradeValues[downGrade as keyof typeof gradeValues] + 
+                                   gradeValues[upGrade as keyof typeof gradeValues] + 
+                                   gradeValues[pingGrade as keyof typeof gradeValues]) / 3;
+            let overallGrade = 'F';
+            if (avgGradeValue >= 4.2) overallGrade = 'A+';
+            else if (avgGradeValue >= 3.5) overallGrade = 'A';
+            else if (avgGradeValue >= 2.5) overallGrade = 'B';
+            else if (avgGradeValue >= 1.5) overallGrade = 'C';
+            else if (avgGradeValue >= 0.5) overallGrade = 'D';
 
             const result: SpeedResult = {
               id: crypto.randomUUID(),
               timestamp: Date.now(),
-              download: Math.round(finalDownload * 10) / 10,
-              upload: Math.round(finalUpload * 10) / 10,
-              ping: Math.round(finalPing),
+              download: Math.round(downloadStats.median * 10) / 10,
+              upload: Math.round(uploadStats.median * 10) / 10,
+              ping: Math.round(pingStats.median),
+              stats: {
+                downloadStats,
+                uploadStats,
+                pingStats,
+                jitter,
+                stabilityScore,
+                grade: overallGrade,
+                trendSlope,
+              },
             };
 
             setDownload(result.download);
@@ -274,6 +478,81 @@ export default function Home() {
         pingDelta: latest.ping - ispPing, // Positive means worse (higher ping), negative means better (lower ping)
       }
     : null;
+
+  // Calculate time-based trends
+  const timeAnalytics = useMemo(() => {
+    if (history.length === 0) return null;
+    
+    const now = Date.now();
+    const oneDayAgo = now - 24 * 60 * 60 * 1000;
+    const sevenDaysAgo = now - 7 * 24 * 60 * 60 * 1000;
+    const thirtyDaysAgo = now - 30 * 24 * 60 * 60 * 1000;
+    
+    const last24h = history.filter(h => h.timestamp >= oneDayAgo);
+    const last7d = history.filter(h => h.timestamp >= sevenDaysAgo);
+    const last30d = history.filter(h => h.timestamp >= thirtyDaysAgo);
+    
+    const calcAvg = (arr: SpeedResult[], key: 'download' | 'upload' | 'ping') => {
+      if (arr.length === 0) return 0;
+      return arr.reduce((sum, item) => sum + item[key], 0) / arr.length;
+    };
+    
+    return {
+      last24h: {
+        count: last24h.length,
+        avgDown: calcAvg(last24h, 'download'),
+        avgUp: calcAvg(last24h, 'upload'),
+        avgPing: calcAvg(last24h, 'ping'),
+      },
+      last7d: {
+        count: last7d.length,
+        avgDown: calcAvg(last7d, 'download'),
+        avgUp: calcAvg(last7d, 'upload'),
+        avgPing: calcAvg(last7d, 'ping'),
+      },
+      last30d: {
+        count: last30d.length,
+        avgDown: calcAvg(last30d, 'download'),
+        avgUp: calcAvg(last30d, 'upload'),
+        avgPing: calcAvg(last30d, 'ping'),
+      },
+    };
+  }, [history]);
+
+  // Export functions
+  const exportAsJSON = () => {
+    const dataStr = JSON.stringify(history, null, 2);
+    const dataBlob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(dataBlob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `speedlab-history-${new Date().toISOString().split('T')[0]}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const exportAsCSV = () => {
+    const headers = ['Timestamp', 'Date', 'Time', 'Download (Mbps)', 'Upload (Mbps)', 'Ping (ms)', 'Grade', 'Jitter', 'Stability Score'];
+    const rows = history.map(item => [
+      item.timestamp,
+      new Date(item.timestamp).toLocaleDateString(),
+      new Date(item.timestamp).toLocaleTimeString(),
+      item.download,
+      item.upload,
+      item.ping,
+      item.stats?.grade || 'N/A',
+      item.stats?.jitter.toFixed(1) || 'N/A',
+      item.stats?.stabilityScore || 'N/A',
+    ]);
+    const csvContent = [headers, ...rows].map(row => row.join(',')).join('\n');
+    const dataBlob = new Blob([csvContent], { type: 'text/csv' });
+    const url = URL.createObjectURL(dataBlob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `speedlab-history-${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
 
   const chartValues = useMemo(() => {
     const list = history.length ? history : [];
@@ -394,20 +673,60 @@ export default function Home() {
               </p>
             </div>
 
-            {/* Live metrics card */}
+            {/* Live metrics card with gauges */}
             <div className="w-full rounded-3xl border border-white/15 bg-gradient-to-br from-white/8 to-white/5 p-6 shadow-2xl backdrop-blur-xl sm:w-80 sm:flex-shrink-0">
               <div className="space-y-1 text-center sm:text-left">
                 <p className="text-xs uppercase tracking-wider text-[#F2C4CE] font-semibold">Live metrics</p>
                 <h3 className="text-sm text-[#D6D6D6]/80">Current test status</h3>
               </div>
-              <div className="mt-5 space-y-3">
-                {[{ label: "↓ Download", value: formatMbps(download) }, { label: "↑ Upload", value: formatMbps(upload) }, { label: "⏱ Ping", value: formatMs(ping) }].map((m) => (
-                  <div key={m.label} className="flex items-center justify-between rounded-xl bg-black/40 px-3 py-2.5">
-                    <p className="text-xs text-[#D6D6D6]/70 font-medium">{m.label}</p>
-                    <p className="text-lg font-semibold text-white">{m.value}</p>
+              
+              {status === "running" && (
+                <div className="mt-6 grid grid-cols-3 gap-4">
+                  <CircularGauge value={ping} max={50} label="Ping" unit="ms" color="#34d399" size={90} />
+                  <CircularGauge value={download} max={ispDown * 1.2} label="Down" unit="Mbps" color="#F58F7C" size={90} />
+                  <CircularGauge value={upload} max={ispUp * 1.2} label="Up" unit="Mbps" color="#F2C4CE" size={90} />
+                </div>
+              )}
+              
+              {status !== "running" && latest?.stats && (
+                <div className="mt-6 space-y-4">
+                  <div className="flex items-center justify-center gap-4">
+                    <div className="flex flex-col items-center gap-2 rounded-2xl bg-gradient-to-br from-white/10 to-white/5 px-6 py-4 border border-white/10">
+                      <span className="text-4xl font-bold text-white">{latest.stats.grade}</span>
+                      <span className="text-xs text-white/60 uppercase tracking-wider">Overall Grade</span>
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <div className="rounded-full px-3 py-1 text-xs font-semibold" style={{ backgroundColor: `${getConditionBadge(latest.stats.grade).color}20`, color: getConditionBadge(latest.stats.grade).color }}>
+                        {getConditionBadge(latest.stats.grade).label}
+                      </div>
+                      <div className="text-xs text-white/60">
+                        Stability: {latest.stats.stabilityScore}%
+                      </div>
+                    </div>
                   </div>
-                ))}
-              </div>
+                  
+                  <div className="grid grid-cols-3 gap-2 text-center">
+                    <div className="rounded-xl bg-black/40 px-2 py-3">
+                      <p className="text-xs text-white/60">Jitter</p>
+                      <p className="text-sm font-bold text-white">{latest.stats.jitter.toFixed(1)}ms</p>
+                    </div>
+                    <div className="rounded-xl bg-black/40 px-2 py-3">
+                      <p className="text-xs text-white/60">Trend</p>
+                      <p className="text-sm font-bold text-white">{latest.stats.trendSlope > 0 ? '📈' : latest.stats.trendSlope < 0 ? '📉' : '➡️'}</p>
+                    </div>
+                    <div className="rounded-xl bg-black/40 px-2 py-3">
+                      <p className="text-xs text-white/60">Tests</p>
+                      <p className="text-sm font-bold text-white">{history.length}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              {status === "idle" && !latest?.stats && (
+                <div className="mt-6 text-center text-sm text-white/60">
+                  Run a test to see detailed metrics
+                </div>
+              )}
             </div>
           </header>
 
@@ -441,7 +760,7 @@ export default function Home() {
                 className="group relative overflow-hidden rounded-full bg-gradient-to-r from-[#F58F7C] to-[#F2C4CE] px-8 py-4 font-semibold text-[#2C2B30] shadow-2xl transition-all duration-300 hover:scale-[1.03] hover:shadow-[0_20px_40px_rgba(245,143,124,0.3)] disabled:cursor-not-allowed disabled:opacity-60 disabled:scale-100"
               >
                 <span className="relative z-10 flex items-center gap-2">
-                  {!running && !status === "done" && "▶"}
+                  {!running && status !== "done" && "▶"}
                   {running ? "Running test..." : status === "done" ? "Run again" : "Start test"}
                 </span>
                 <div className="absolute inset-0 scale-110 bg-white/20 opacity-0 transition-opacity duration-300 group-hover:opacity-100" aria-hidden />
@@ -613,20 +932,59 @@ export default function Home() {
 
               {/* History */}
               <div className="rounded-3xl border border-white/15 bg-gradient-to-br from-white/8 to-white/5 p-6 shadow-2xl backdrop-blur-xl" id="history-section">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between mb-4">
                   <div>
                     <p className="text-xs uppercase tracking-wider text-[#F2C4CE] font-semibold">History</p>
                     <h3 className="text-lg font-semibold text-white">Test logs</h3>
                   </div>
                   {history.length > 0 && (
-                    <button
-                      className="text-xs text-[#D6D6D6]/70 hover:text-[#F58F7C] transition-colors font-medium"
-                      onClick={() => setHistory([])}
-                    >
-                      Clear
-                    </button>
+                    <div className="flex gap-2">
+                      <button
+                        className="text-xs text-[#D6D6D6]/70 hover:text-[#F58F7C] transition-colors font-medium"
+                        onClick={exportAsCSV}
+                        title="Export as CSV"
+                      >
+                        📊 CSV
+                      </button>
+                      <button
+                        className="text-xs text-[#D6D6D6]/70 hover:text-[#F58F7C] transition-colors font-medium"
+                        onClick={exportAsJSON}
+                        title="Export as JSON"
+                      >
+                        📄 JSON
+                      </button>
+                      <button
+                        className="text-xs text-[#D6D6D6]/70 hover:text-[#F58F7C] transition-colors font-medium"
+                        onClick={() => setHistory([])}
+                      >
+                        Clear
+                      </button>
+                    </div>
                   )}
                 </div>
+
+                {/* Time-based analytics */}
+                {timeAnalytics && timeAnalytics.last24h.count > 0 && (
+                  <div className="mb-4 space-y-2 rounded-xl bg-black/30 border border-white/10 p-3">
+                    <p className="text-xs font-semibold text-white uppercase tracking-wider">Analytics Summary</p>
+                    {[
+                      { label: '24h', data: timeAnalytics.last24h },
+                      { label: '7d', data: timeAnalytics.last7d },
+                      { label: '30d', data: timeAnalytics.last30d },
+                    ].filter(period => period.data.count > 0).map(period => (
+                      <div key={period.label} className="flex items-center justify-between text-xs">
+                        <span className="text-white/60 font-medium">{period.label} avg:</span>
+                        <div className="flex gap-2">
+                          <span className="text-[#F58F7C]">↓{period.data.avgDown.toFixed(1)}</span>
+                          <span className="text-[#F2C4CE]">↑{period.data.avgUp.toFixed(1)}</span>
+                          <span className="text-emerald-400">⏱{period.data.avgPing.toFixed(0)}ms</span>
+                          <span className="text-white/40">({period.data.count} tests)</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
                 <div className="mt-4 space-y-2 max-h-64 overflow-y-auto">
                   {history.length === 0 && (
                     <p className="text-sm text-[#D6D6D6]/70">Run a test to see results.</p>
@@ -634,11 +992,16 @@ export default function Home() {
                   {history.map((item) => (
                     <div
                       key={item.id}
-                      className="flex items-center justify-between rounded-xl bg-black/30 border border-white/5 px-3 py-2 text-xs hover:bg-black/50 transition-colors"
+                      className="flex items-center justify-between rounded-xl bg-black/30 border border-white/5 px-3 py-2 text-xs hover:bg-black/50 transition-colors group"
                     >
                       <div className="flex gap-2 flex-1">
                         <span className="text-[#F58F7C] font-medium">↓ {formatMbps(item.download)}</span>
                         <span className="text-[#F2C4CE] font-medium">↑ {formatMbps(item.upload)}</span>
+                        {item.stats && (
+                          <span className="text-white/60 opacity-0 group-hover:opacity-100 transition-opacity">
+                            Grade: {item.stats.grade}
+                          </span>
+                        )}
                       </div>
                       <span className="text-[#D6D6D6]/60 text-xs whitespace-nowrap ml-2">
                         {new Date(item.timestamp).toLocaleTimeString()}
@@ -649,6 +1012,160 @@ export default function Home() {
               </div>
             </div>
           </section>
+
+          {/* Detailed Statistics Panel (shown after test complete) */}
+          {status === "done" && latest?.stats && (
+            <section className="rounded-3xl border border-white/15 bg-gradient-to-br from-white/8 to-white/5 p-8 shadow-2xl backdrop-blur-xl">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4">
+                <div>
+                  <p className="text-xs uppercase tracking-wider text-[#F2C4CE] font-semibold">Statistical Analysis</p>
+                  <h3 className="text-xl font-semibold text-white">Detailed Performance Metrics</h3>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-6xl font-bold text-white">{latest.stats.grade}</span>
+                  <div className="flex flex-col gap-1">
+                    <span className="rounded-full px-4 py-1.5 text-sm font-semibold" style={{ backgroundColor: `${getConditionBadge(latest.stats.grade).color}20`, color: getConditionBadge(latest.stats.grade).color }}>
+                      {getConditionBadge(latest.stats.grade).label}
+                    </span>
+                    <div className="text-xs text-white/60 text-center">
+                      {latest.stats.stabilityScore}% stable
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid gap-6 md:grid-cols-3">
+                {/* Download Stats */}
+                <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-[#F58F7C]/10 to-transparent p-5">
+                  <div className="flex items-center gap-2 mb-4">
+                    <span className="text-2xl">↓</span>
+                    <h4 className="text-sm font-semibold text-white uppercase tracking-wider">Download</h4>
+                  </div>
+                  <div className="space-y-3">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-white/60">Median:</span>
+                      <span className="font-bold text-[#F58F7C]">{latest.stats.downloadStats.median.toFixed(1)} Mbps</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-white/60">Mean:</span>
+                      <span className="font-semibold text-white">{latest.stats.downloadStats.mean.toFixed(1)} Mbps</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-white/60">Std Dev:</span>
+                      <span className="font-semibold text-white">{latest.stats.downloadStats.stdDev.toFixed(2)}</span>
+                    </div>
+                    <div className="h-px bg-white/10" />
+                    <div className="flex justify-between text-xs">
+                      <span className="text-white/50">Min:</span>
+                      <span className="text-white/80">{latest.stats.downloadStats.min.toFixed(1)}</span>
+                    </div>
+                    <div className="flex justify-between text-xs">
+                      <span className="text-white/50">Max:</span>
+                      <span className="text-white/80">{latest.stats.downloadStats.max.toFixed(1)}</span>
+                    </div>
+                    <div className="flex justify-between text-xs">
+                      <span className="text-white/50">P95:</span>
+                      <span className="text-white/80">{latest.stats.downloadStats.p95.toFixed(1)}</span>
+                    </div>
+                    <div className="flex justify-between text-xs">
+                      <span className="text-white/50">P99:</span>
+                      <span className="text-white/80">{latest.stats.downloadStats.p99.toFixed(1)}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Upload Stats */}
+                <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-[#F2C4CE]/10 to-transparent p-5">
+                  <div className="flex items-center gap-2 mb-4">
+                    <span className="text-2xl">↑</span>
+                    <h4 className="text-sm font-semibold text-white uppercase tracking-wider">Upload</h4>
+                  </div>
+                  <div className="space-y-3">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-white/60">Median:</span>
+                      <span className="font-bold text-[#F2C4CE]">{latest.stats.uploadStats.median.toFixed(1)} Mbps</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-white/60">Mean:</span>
+                      <span className="font-semibold text-white">{latest.stats.uploadStats.mean.toFixed(1)} Mbps</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-white/60">Std Dev:</span>
+                      <span className="font-semibold text-white">{latest.stats.uploadStats.stdDev.toFixed(2)}</span>
+                    </div>
+                    <div className="h-px bg-white/10" />
+                    <div className="flex justify-between text-xs">
+                      <span className="text-white/50">Min:</span>
+                      <span className="text-white/80">{latest.stats.uploadStats.min.toFixed(1)}</span>
+                    </div>
+                    <div className="flex justify-between text-xs">
+                      <span className="text-white/50">Max:</span>
+                      <span className="text-white/80">{latest.stats.uploadStats.max.toFixed(1)}</span>
+                    </div>
+                    <div className="flex justify-between text-xs">
+                      <span className="text-white/50">P95:</span>
+                      <span className="text-white/80">{latest.stats.uploadStats.p95.toFixed(1)}</span>
+                    </div>
+                    <div className="flex justify-between text-xs">
+                      <span className="text-white/50">P99:</span>
+                      <span className="text-white/80">{latest.stats.uploadStats.p99.toFixed(1)}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Ping & Quality Stats */}
+                <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-emerald-400/10 to-transparent p-5">
+                  <div className="flex items-center gap-2 mb-4">
+                    <span className="text-2xl">⏱</span>
+                    <h4 className="text-sm font-semibold text-white uppercase tracking-wider">Ping & Quality</h4>
+                  </div>
+                  <div className="space-y-3">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-white/60">Median:</span>
+                      <span className="font-bold text-emerald-400">{latest.stats.pingStats.median.toFixed(0)} ms</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-white/60">Jitter:</span>
+                      <span className="font-semibold text-white">{latest.stats.jitter.toFixed(1)} ms</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-white/60">Stability:</span>
+                      <span className="font-semibold text-white">{latest.stats.stabilityScore}%</span>
+                    </div>
+                    <div className="h-px bg-white/10" />
+                    <div className="flex justify-between text-xs">
+                      <span className="text-white/50">Min:</span>
+                      <span className="text-white/80">{latest.stats.pingStats.min.toFixed(0)} ms</span>
+                    </div>
+                    <div className="flex justify-between text-xs">
+                      <span className="text-white/50">Max:</span>
+                      <span className="text-white/80">{latest.stats.pingStats.max.toFixed(0)} ms</span>
+                    </div>
+                    <div className="flex justify-between text-xs">
+                      <span className="text-white/50">Trend:</span>
+                      <span className="text-white/80">
+                        {latest.stats.trendSlope > 0.5 ? '📈 Improving' : latest.stats.trendSlope < -0.5 ? '📉 Degrading' : '➡️ Stable'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-xs">
+                      <span className="text-white/50">Variance:</span>
+                      <span className="text-white/80">{latest.stats.pingStats.stdDev.toFixed(2)}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-6 rounded-xl bg-black/30 border border-white/10 p-4">
+                <p className="text-xs text-white/60 leading-relaxed">
+                  <strong className="text-white">About these statistics:</strong> Median values are used for final results as they're resistant to outliers. 
+                  Standard deviation measures consistency (lower is better). P95/P99 show the 95th/99th percentile values. 
+                  Jitter measures ping variation (lower is better for gaming/calls). 
+                  Stability score combines all metrics into a 0-100 rating. 
+                  Trend slope indicates if connection is improving, degrading, or stable during the test.
+                </p>
+              </div>
+            </section>
+          )}
 
           {/* Baseline comparator */}
           <section className="rounded-3xl border border-white/15 bg-gradient-to-br from-white/8 to-white/5 p-8 shadow-2xl backdrop-blur-xl" id="baseline-section">
