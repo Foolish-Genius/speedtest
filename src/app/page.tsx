@@ -12,6 +12,8 @@ type SpeedResult = {
   ping: number;
   networkType?: NetworkType;
   location?: string;
+  serverId?: string;
+  serverName?: string;
   stats?: {
     downloadStats: DetailedStats;
     uploadStats: DetailedStats;
@@ -25,6 +27,25 @@ type SpeedResult = {
 
 type NetworkType = "wifi" | "ethernet" | "mobile" | "unknown";
 type TestProfile = "quick" | "standard" | "extended";
+
+// Test server configuration
+type TestServer = {
+  id: string;
+  name: string;
+  location: string;
+  region: string;
+  latency?: number;
+};
+
+const TEST_SERVERS: TestServer[] = [
+  { id: 'auto', name: 'Auto Select', location: 'Nearest', region: 'auto' },
+  { id: 'us-east', name: 'US East', location: 'New York', region: 'NA' },
+  { id: 'us-west', name: 'US West', location: 'Los Angeles', region: 'NA' },
+  { id: 'eu-west', name: 'EU West', location: 'London', region: 'EU' },
+  { id: 'eu-central', name: 'EU Central', location: 'Frankfurt', region: 'EU' },
+  { id: 'asia-east', name: 'Asia East', location: 'Tokyo', region: 'APAC' },
+  { id: 'asia-south', name: 'Asia South', location: 'Singapore', region: 'APAC' },
+];
 
 type DetailedStats = {
   mean: number;
@@ -599,6 +620,7 @@ export default function Home() {
   const [incognitoMode, setIncognitoMode] = useState(false);
   const [testProfile, setTestProfile] = useState<TestProfile>("standard");
   const [showSettings, setShowSettings] = useState(false);
+  const [selectedServer, setSelectedServer] = useState<string>("auto");
   
   // Accessibility settings
   const [highContrast, setHighContrast] = useState(false);
@@ -885,6 +907,8 @@ export default function Home() {
               ping: Math.round(pingStats.median),
               networkType: networkType,
               location: location || undefined,
+              serverId: selectedServer,
+              serverName: TEST_SERVERS.find(s => s.id === selectedServer)?.name || 'Auto',
               stats: {
                 downloadStats,
                 uploadStats,
@@ -1734,6 +1758,26 @@ export default function Home() {
                       disabled={running}
                       className="w-full px-3 py-2 rounded-lg bg-[var(--background)] border border-[var(--border)] text-sm placeholder:text-[var(--foreground-muted)]/50 focus:outline-none focus:border-[#ff7b6b] transition-colors disabled:opacity-50"
                     />
+                  </div>
+
+                  {/* Server Selection */}
+                  <div>
+                    <label className="text-xs text-[var(--foreground-muted)] uppercase tracking-wider mb-2 block">Test Server</label>
+                    <select
+                      value={selectedServer}
+                      onChange={(e) => setSelectedServer(e.target.value)}
+                      disabled={running}
+                      className="w-full px-3 py-2 rounded-lg bg-[var(--background)] border border-[var(--border)] text-sm focus:outline-none focus:border-[#ff7b6b] transition-colors disabled:opacity-50 cursor-pointer"
+                    >
+                      {TEST_SERVERS.map((server) => (
+                        <option key={server.id} value={server.id}>
+                          {server.name} - {server.location}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-[10px] text-[var(--foreground-muted)] mt-1">
+                      {selectedServer === 'auto' ? 'Will select nearest server' : `Region: ${TEST_SERVERS.find(s => s.id === selectedServer)?.region}`}
+                    </p>
                   </div>
 
                 </div>
