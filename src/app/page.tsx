@@ -1275,6 +1275,90 @@ export default function Home() {
         onRunAgain={() => startTest(false)}
       />
       
+      {/* Achievements Modal */}
+      {showAchievements && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => setShowAchievements(false)}>
+          <div 
+            className="relative w-full max-w-2xl max-h-[80vh] overflow-auto rounded-3xl border border-[var(--border)] bg-[var(--card)] p-6 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setShowAchievements(false)}
+              className="absolute top-4 right-4 text-[var(--foreground-muted)] hover:text-[var(--foreground)] transition-colors"
+              aria-label="Close achievements"
+            >
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+            
+            <div className="mb-6">
+              <h2 className="text-2xl font-bold flex items-center gap-2">🏆 Achievements</h2>
+              <p className="text-sm text-[var(--foreground-muted)] mt-1">
+                {achievementProgress.unlocked} of {achievementProgress.total} unlocked ({achievementProgress.percentage}%)
+              </p>
+              
+              {/* Progress bar */}
+              <div className="mt-3 h-2 rounded-full bg-[var(--background-secondary)] overflow-hidden">
+                <div 
+                  className="h-full rounded-full bg-gradient-to-r from-[#ff7b6b] to-[#f4b8c5] transition-all duration-500"
+                  style={{ width: `${achievementProgress.percentage}%` }}
+                />
+              </div>
+              
+              {/* Tier breakdown */}
+              <div className="flex gap-4 mt-3 text-xs">
+                <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-amber-600" /> {achievementProgress.byTier.bronze} Bronze</span>
+                <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-gray-400" /> {achievementProgress.byTier.silver} Silver</span>
+                <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-yellow-400" /> {achievementProgress.byTier.gold} Gold</span>
+                <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-cyan-300" /> {achievementProgress.byTier.platinum} Platinum</span>
+              </div>
+            </div>
+            
+            <div className="grid gap-3 sm:grid-cols-2">
+              {ACHIEVEMENTS.map((achievement) => {
+                const isUnlocked = unlockedAchievements.some(a => a.id === achievement.id);
+                const tierColors = {
+                  bronze: 'border-amber-600/50 bg-amber-600/10',
+                  silver: 'border-gray-400/50 bg-gray-400/10',
+                  gold: 'border-yellow-400/50 bg-yellow-400/10',
+                  platinum: 'border-cyan-300/50 bg-cyan-300/10',
+                };
+                return (
+                  <div 
+                    key={achievement.id}
+                    className={`rounded-xl border p-4 transition-all ${
+                      isUnlocked 
+                        ? tierColors[achievement.tier]
+                        : 'border-[var(--border)] bg-[var(--background)] opacity-50'
+                    }`}
+                  >
+                    <div className="flex items-start gap-3">
+                      <span className={`text-2xl ${isUnlocked ? '' : 'grayscale'}`}>{achievement.icon}</span>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <p className="font-semibold text-sm">{achievement.name}</p>
+                          {isUnlocked && <span className="text-xs text-[#34d399]">✓</span>}
+                        </div>
+                        <p className="text-xs text-[var(--foreground-muted)] mt-0.5">{achievement.description}</p>
+                        <span className={`inline-block mt-2 text-[10px] px-2 py-0.5 rounded-full uppercase font-semibold ${
+                          achievement.tier === 'bronze' ? 'bg-amber-600/20 text-amber-600' :
+                          achievement.tier === 'silver' ? 'bg-gray-400/20 text-gray-400' :
+                          achievement.tier === 'gold' ? 'bg-yellow-400/20 text-yellow-600' :
+                          'bg-cyan-300/20 text-cyan-400'
+                        }`}>
+                          {achievement.tier}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+      
       <div className="relative overflow-hidden">
         {/* Gradient orbs */}
         <div className="pointer-events-none absolute inset-0 opacity-30" aria-hidden>
@@ -1317,6 +1401,20 @@ export default function Home() {
                 className="text-sm text-[var(--foreground-muted)] hover:text-[#ff7b6b] transition-colors font-medium"
               >
                 Baseline
+              </button>
+              <button 
+                onClick={() => setShowAchievements(true)}
+                className="text-sm text-[var(--foreground-muted)] hover:text-[#ff7b6b] transition-colors font-medium flex items-center gap-1"
+              >
+                🏆 <span className="text-xs bg-[var(--background-secondary)] px-1.5 py-0.5 rounded-full">{achievementProgress.unlocked}</span>
+              </button>
+              <button
+                onClick={() => setHighContrast(!highContrast)}
+                className={`text-sm transition-colors font-medium ${highContrast ? 'text-[#ff7b6b]' : 'text-[var(--foreground-muted)] hover:text-[#ff7b6b]'}`}
+                title="Toggle high contrast mode"
+                aria-label="Toggle high contrast mode"
+              >
+                {highContrast ? '◐' : '◑'}
               </button>
               <ThemeToggle theme={theme} setTheme={setTheme} />
             </div>
@@ -1366,6 +1464,21 @@ export default function Home() {
                   className="text-sm text-[var(--foreground-muted)] hover:text-[#ff7b6b] transition-colors text-left font-medium"
                 >
                   Baseline
+                </button>
+                <button 
+                  onClick={() => {
+                    setShowAchievements(true);
+                    setMenuOpen(false);
+                  }}
+                  className="text-sm text-[var(--foreground-muted)] hover:text-[#ff7b6b] transition-colors text-left font-medium flex items-center gap-2"
+                >
+                  🏆 Achievements <span className="text-xs bg-[var(--background-secondary)] px-1.5 py-0.5 rounded-full">{achievementProgress.unlocked}</span>
+                </button>
+                <button 
+                  onClick={() => setHighContrast(!highContrast)}
+                  className="text-sm text-[var(--foreground-muted)] hover:text-[#ff7b6b] transition-colors text-left font-medium flex items-center gap-2"
+                >
+                  {highContrast ? '◐' : '◑'} High Contrast {highContrast && <span className="text-xs text-[#34d399]">ON</span>}
                 </button>
               </div>
             </div>
