@@ -2878,6 +2878,23 @@ export default function Home() {
 
         </main>
 
+        {/* Footer */}
+        <footer className="relative border-t border-[var(--border)]/30 bg-[var(--card)]/40 backdrop-blur-sm">
+          <div className="mx-auto max-w-7xl px-6 py-4 sm:px-10 md:px-14">
+            <p className="text-center text-xs text-[var(--foreground-muted)]">
+              Vibecoded with <span className="text-[#ff7b6b]">♥</span> by{' '}
+              <a 
+                href="https://github.com/Foolish-Genius/speedtest" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="font-medium text-[#3B82F6] hover:text-[#60A5FA] transition-colors"
+              >
+                Foolish Genius
+              </a>
+            </p>
+          </div>
+        </footer>
+
         {/* Results Modal */}
         {showResultsModal && latest && (
           <ResultsModal 
