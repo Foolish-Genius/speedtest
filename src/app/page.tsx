@@ -1152,33 +1152,54 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* Start Button */}
-              <button
-                onClick={startTest}
-                disabled={running}
-                className="group relative overflow-hidden rounded-full bg-gradient-to-r from-[#ff7b6b] to-[#f4b8c5] px-6 py-3 font-semibold text-white shadow-2xl transition-all duration-300 hover:scale-[1.02] hover:shadow-[0_20px_40px_rgba(255,123,107,0.3)] disabled:cursor-not-allowed disabled:opacity-60 disabled:scale-100 text-sm ripple w-full"
-              >
-                <span className="relative z-10 flex items-center justify-center gap-3">
-                  {running ? (
-                    <>
-                      <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                      </svg>
-                      Testing...
-                    </>
-                  ) : status === "done" ? (
-                    "Test Again"
-                  ) : (
-                    <>
-                      <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
-                      </svg>
-                      Start Test
-                    </>
-                  )}
-                </span>
-              </button>
+              {/* Start Buttons - Split into Regular and Incognito */}
+              <div className="flex gap-2">
+                <button
+                  onClick={() => { setIncognitoMode(false); startTest(); }}
+                  disabled={running}
+                  className="group relative overflow-hidden rounded-full bg-gradient-to-r from-[#ff7b6b] to-[#f4b8c5] px-5 py-3 font-semibold text-white shadow-2xl transition-all duration-300 hover:scale-[1.02] hover:shadow-[0_20px_40px_rgba(255,123,107,0.3)] disabled:cursor-not-allowed disabled:opacity-60 disabled:scale-100 text-sm ripple flex-1"
+                >
+                  <span className="relative z-10 flex items-center justify-center gap-2">
+                    {running && !incognitoMode ? (
+                      <>
+                        <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                        </svg>
+                        Testing...
+                      </>
+                    ) : status === "done" ? (
+                      "Test Again"
+                    ) : (
+                      <>
+                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
+                        </svg>
+                        Start Test
+                      </>
+                    )}
+                  </span>
+                </button>
+                <button
+                  onClick={() => { setIncognitoMode(true); startTest(); }}
+                  disabled={running}
+                  title="Run test without saving to history"
+                  className="group relative overflow-hidden rounded-full bg-[var(--background-secondary)] border border-[var(--border)] px-4 py-3 font-semibold text-[var(--foreground)] transition-all duration-300 hover:scale-[1.02] hover:bg-[var(--card)] disabled:cursor-not-allowed disabled:opacity-60 disabled:scale-100 text-sm"
+                >
+                  <span className="relative z-10 flex items-center justify-center gap-2">
+                    {running && incognitoMode ? (
+                      <>
+                        <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                        </svg>
+                      </>
+                    ) : (
+                      <span className="text-base">🕵️</span>
+                    )}
+                  </span>
+                </button>
+              </div>
 
               {/* Test Options Toggle */}
               <button
@@ -1252,27 +1273,6 @@ export default function Home() {
                     />
                   </div>
 
-                  {/* Incognito Mode */}
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="text-base">🕵️</span>
-                      <div>
-                        <p className="text-xs font-medium">Incognito Mode</p>
-                        <p className="text-[10px] text-[var(--foreground-muted)]">Don&apos;t save to history</p>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => setIncognitoMode(!incognitoMode)}
-                      disabled={running}
-                      className={`relative w-11 h-6 rounded-full transition-colors ${
-                        incognitoMode ? 'bg-[#ff7b6b]' : 'bg-[var(--background-secondary)]'
-                      } disabled:opacity-50`}
-                    >
-                      <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform ${
-                        incognitoMode ? 'translate-x-6' : 'translate-x-1'
-                      }`} />
-                    </button>
-                  </div>
                 </div>
               )}
             </div>
