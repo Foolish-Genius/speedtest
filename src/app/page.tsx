@@ -650,6 +650,14 @@ export default function Home() {
     issues: []
   });
   
+  // Data retention settings
+  const [dataRetention, setDataRetention] = useState<{
+    maxEntries: number;
+    autoDelete: boolean;
+    deleteAfterDays: number;
+  }>({ maxEntries: 100, autoDelete: false, deleteAfterDays: 30 });
+  const [showDataControls, setShowDataControls] = useState(false);
+  
   // Ref to track incognito mode during async test execution
   const incognitoRef = useRef(false);
 
@@ -705,12 +713,46 @@ export default function Home() {
     }
   }, []);
 
-  // Save history to localStorage
+  // Save history to localStorage with data retention enforcement
   useEffect(() => {
     if (historyLoaded) {
-      window.localStorage.setItem("speedtest-history", JSON.stringify(history));
+      let filteredHistory = [...history];
+      
+      // Enforce max entries
+      if (filteredHistory.length > dataRetention.maxEntries) {
+        filteredHistory = filteredHistory.slice(0, dataRetention.maxEntries);
+      }
+      
+      // Enforce auto-delete after days
+      if (dataRetention.autoDelete && dataRetention.deleteAfterDays > 0) {
+        const cutoffDate = Date.now() - (dataRetention.deleteAfterDays * 24 * 60 * 60 * 1000);
+        filteredHistory = filteredHistory.filter(r => r.timestamp > cutoffDate);
+      }
+      
+      // Update state if filtering changed the history
+      if (filteredHistory.length !== history.length) {
+        setHistory(filteredHistory);
+      }
+      
+      window.localStorage.setItem("speedtest-history", JSON.stringify(filteredHistory));
     }
-  }, [history, historyLoaded]);
+  }, [history, historyLoaded, dataRetention]);
+
+  // Load/save data retention settings
+  useEffect(() => {
+    const stored = window.localStorage.getItem("speedtest-dataretention");
+    if (stored) {
+      try {
+        setDataRetention(JSON.parse(stored));
+      } catch {
+        // Use defaults
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem("speedtest-dataretention", JSON.stringify(dataRetention));
+  }, [dataRetention]);
 
   // Save baseline to localStorage
   useEffect(() => {
@@ -1937,6 +1979,84 @@ export default function Home() {
                     <p className="text-[10px] text-[var(--foreground-muted)] mt-1">
                       {selectedServer === 'auto' ? 'Will select nearest server' : `Region: ${TEST_SERVERS.find(s => s.id === selectedServer)?.region}`}
                     </p>
+                  </div>
+
+                  {/* Data Retention Controls */}
+                  <div className="pt-3 border-t border-[var(--border)]">
+                    <button
+                      onClick={() => setShowDataControls(!showDataControls)}
+                      className="flex items-center justify-between w-full text-xs text-[var(--foreground-muted)] hover:text-[var(--foreground)] transition-colors"
+                    >
+                      <span className="uppercase tracking-wider">Data Retention</span>
+                      <svg className={`w-4 h-4 transition-transform ${showDataControls ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+                    
+                    {showDataControls && (
+                      <div className="mt-3 space-y-3">
+                        {/* Max Entries */}
+                        <div>
+                          <label className="text-[10px] text-[var(--foreground-muted)] mb-1 block">Max History Entries</label>
+                          <select
+                            value={dataRetention.maxEntries}
+                            onChange={(e) => setDataRetention(prev => ({ ...prev, maxEntries: parseInt(e.target.value) }))}
+                            className="w-full px-3 py-2 rounded-lg bg-[var(--background)] border border-[var(--border)] text-sm focus:outline-none focus:border-[#ff7b6b] transition-colors cursor-pointer"
+                          >
+                            <option value={25}>25 entries</option>
+                            <option value={50}>50 entries</option>
+                            <option value={100}>100 entries</option>
+                            <option value={250}>250 entries</option>
+                            <option value={500}>500 entries</option>
+                          </select>
+                        </div>
+                        
+                        {/* Auto Delete */}
+                        <div className="flex items-center justify-between">
+                          <label className="text-[10px] text-[var(--foreground-muted)]">Auto-delete old data</label>
+                          <button
+                            onClick={() => setDataRetention(prev => ({ ...prev, autoDelete: !prev.autoDelete }))}
+                            className={`w-10 h-5 rounded-full transition-colors ${dataRetention.autoDelete ? 'bg-[#34d399]' : 'bg-[var(--background-secondary)]'}`}
+                          >
+                            <span className={`block w-4 h-4 rounded-full bg-white shadow transform transition-transform ${dataRetention.autoDelete ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                          </button>
+                        </div>
+                        
+                        {/* Delete After Days */}
+                        {dataRetention.autoDelete && (
+                          <div>
+                            <label className="text-[10px] text-[var(--foreground-muted)] mb-1 block">Delete after</label>
+                            <select
+                              value={dataRetention.deleteAfterDays}
+                              onChange={(e) => setDataRetention(prev => ({ ...prev, deleteAfterDays: parseInt(e.target.value) }))}
+                              className="w-full px-3 py-2 rounded-lg bg-[var(--background)] border border-[var(--border)] text-sm focus:outline-none focus:border-[#ff7b6b] transition-colors cursor-pointer"
+                            >
+                              <option value={7}>7 days</option>
+                              <option value={14}>14 days</option>
+                              <option value={30}>30 days</option>
+                              <option value={60}>60 days</option>
+                              <option value={90}>90 days</option>
+                            </select>
+                          </div>
+                        )}
+                        
+                        {/* Clear All Data */}
+                        <button
+                          onClick={() => {
+                            if (confirm('Are you sure you want to delete all test history? This cannot be undone.')) {
+                              setHistory([]);
+                            }
+                          }}
+                          className="w-full px-3 py-2 rounded-lg bg-[#ff7b6b]/20 text-[#ff7b6b] text-sm font-medium hover:bg-[#ff7b6b]/30 transition-colors"
+                        >
+                          🗑️ Clear All History
+                        </button>
+                        
+                        <p className="text-[10px] text-[var(--foreground-muted)]">
+                          Currently storing {history.length} test results
+                        </p>
+                      </div>
+                    )}
                   </div>
 
                 </div>
